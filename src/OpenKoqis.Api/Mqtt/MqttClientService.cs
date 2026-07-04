@@ -1,7 +1,9 @@
 using System.Text;
 using System.Text.Json;
+using MediatR;
+using Microsoft.Extensions.DependencyInjection;
 using MQTTnet;
-using OpenKoqis.Application.Services;
+using OpenKoqis.Application.Features.Bins.Commands;
 using OpenKoqis.Domain.Models;
 
 namespace OpenKoqis.Api.Mqtt;
@@ -12,10 +14,15 @@ public class MqttClientService : BackgroundService
     private readonly IMqttClient _client;
     private readonly MqttClientOptions _options;
     private readonly MqttClientSubscribeOptions _subscribeOptions;
+    private readonly IServiceScopeFactory _serviceScopeFactory;
 
-    public MqttClientService(IConfiguration config, ILogger<MqttClientService> logger, IBinService binService)
+    public MqttClientService(
+        IConfiguration config,
+        ILogger<MqttClientService> logger,
+        IServiceScopeFactory serviceScopeFactory)
     {
         _logger = logger;
+        _serviceScopeFactory = serviceScopeFactory;
 
         var factory = new MqttClientFactory();
         _client = factory.CreateMqttClient();
@@ -34,19 +41,8 @@ public class MqttClientService : BackgroundService
         }
 
         _options = optionsBuilder.Build();
-
         _logger.LogInformation("Options for MQTT server was built");
 
-
-        // MQTT message receiving
-        //_client.ApplicationMessageReceivedAsync += e =>
-        //{
-        //    var topic = e.ApplicationMessage.Topic;
-        //    var payload = Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
-
-        //    _logger.LogDebug("Received message on topic \'{Topic}\': {Payload}", topic, payload);
-        //    return Task.CompletedTask;
-        //};
         _client.ApplicationMessageReceivedAsync += async e =>
         {
             var topic = e.ApplicationMessage.Topic;
@@ -62,10 +58,17 @@ public class MqttClientService : BackgroundService
                 return;
             }
 
-            await binService.UpdateTelemetryAsync(binId, telemetry);
-            await binService.UpdateTelemetryHistoryAsync(binId, telemetry);
+            using var scope = _serviceScopeFactory.CreateScope();
+            var mediator = scope.ServiceProvider.GetRequiredService<ISender>();
 
-            _logger.LogInformation("Updated bin {Id} via MQTT", binId);
+            var command = new UpdateBinTelemetryCommand(binId, telemetry);
+            var result = await mediator.Send(command);
+
+            result.Switch(
+                _ => _logger.LogInformation("Updated bin {Id} via MQTT", binId),
+                errors => _logger.LogWarning("Failed to update telemetry for bin {Id}. Errors: {Errors}",
+                    binId, string.Join(", ", errors.Select(err => err.Description)))
+            );
         };
 
         var subscribeOptionsFilter = new MqttClientSubscribeOptionsBuilder();
@@ -77,7 +80,6 @@ public class MqttClientService : BackgroundService
             subscribeOptionsFilter.WithTopicFilter(topic);
 
         _subscribeOptions = subscribeOptionsFilter.Build();
-
         _logger.LogInformation("Subscribe Options for MQTT server was built");
     }
 
@@ -89,12 +91,10 @@ public class MqttClientService : BackgroundService
         await _client.SubscribeAsync(_subscribeOptions, ct);
         _logger.LogInformation("Subscribed to MQTT topics");
 
-        // Keep process alive for the lifetime of the server
         while (!ct.IsCancellationRequested)
             await Task.Delay(1000, ct);
 
         _logger.LogInformation("Disconnected from MQTT server");
-        // ReSharper disable once MethodSupportsCancellation
         await _client.DisconnectAsync(cancellationToken: ct);
     }
 }

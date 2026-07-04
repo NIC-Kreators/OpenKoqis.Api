@@ -1,6 +1,8 @@
-using System.Security.Authentication;
+using ErrorOr;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using OpenKoqis.Application.Services;
+using OpenKoqis.Application.Features.Users.Commands;
+using OpenKoqis.Application.Features.Users.Queries;
 using OpenKoqis.Domain.Models;
 using OpenKoqis.Domain.Models.Dto;
 
@@ -8,60 +10,87 @@ namespace OpenKoqis.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class UsersController(IUserService userService, ILogger<UsersController> logger) : ControllerBase
+public class UsersController(ISender mediator, ILogger<UsersController> logger) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<List<User>>> GetAsync()
+    public async Task<IActionResult> GetAsync()
     {
         logger.LogInformation("Fetching all users from the database");
-        var users = await userService.GetAllAsync();
-        logger.LogInformation("Successfully retrieved {Count} users", users.Count);
-        return Ok(users);
+
+        var result = await mediator.Send(new GetAllUsersQuery());
+
+        return result.Match(
+            users =>
+            {
+                logger.LogInformation("Successfully retrieved {Count} users", users.Count);
+                return Ok(users);
+            },
+            errors => Problem(errors)
+        );
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<User>> GetByIdAsync(string id)
+    public async Task<IActionResult> GetByIdAsync(string id)
     {
         logger.LogInformation("Fetching user with ID: {UserId}", id);
-        var user = await userService.GetByIdAsync(id);
 
-        if (user == null)
-        {
-            logger.LogWarning("User with ID: {UserId} not found", id);
-            return NotFound();
-        }
+        var result = await mediator.Send(new GetUserByIdQuery(id));
 
-        return Ok(user);
+        return result.Match(
+            user => Ok(user),
+            errors => Problem(errors)
+        );
     }
 
     [HttpPost]
-    public async Task<ActionResult<User>> PostAsync([FromBody] User user)
+    public async Task<IActionResult> PostAsync([FromBody] User user)
     {
         logger.LogInformation("Creating a new user: {Nickname}", user.Nickname);
-        var created = await userService.CreateAsync(user);
-        logger.LogInformation("User created with ID: {UserId}", created.Id);
-        return CreatedAtAction(nameof(GetAsync), new
-        {
-            id = created.Id.ToString()
-        }, created);
+
+        var result = await mediator.Send(new CreateUserCommand(user));
+
+        return result.Match(
+            created =>
+            {
+                logger.LogInformation("User created with ID: {UserId}", created.Id);
+                return CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id.ToString() }, created);
+            },
+            errors => Problem(errors)
+        );
     }
 
     [HttpPut("{id}")]
     public async Task<IActionResult> PutAsync(string id, [FromBody] User user)
     {
         logger.LogInformation("Updating user with ID: {UserId}", id);
-        await userService.UpdateAsync(id, user);
-        logger.LogInformation("User {UserId} updated successfully", id);
-        return NoContent();
+
+        var result = await mediator.Send(new UpdateUserCommand(id, user));
+
+        return result.Match(
+            _ =>
+            {
+                logger.LogInformation("User {UserId} updated successfully", id);
+                return NoContent();
+            },
+            errors => Problem(errors)
+        );
     }
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteAsync(string id)
     {
         logger.LogInformation("Attempting to delete user with ID: {UserId}", id);
-        await userService.DeleteAsync(id);
-        logger.LogInformation("User {UserId} deleted", id);
-        return NoContent();
+
+        var result = await mediator.Send(new DeleteUserCommand(id));
+
+        return result.Match(
+            _ =>
+            {
+                logger.LogInformation("User {UserId} deleted", id);
+                return NoContent();
+            },
+            errors => Problem(errors)
+        );
     }
 
     [HttpPost("register")]
@@ -69,20 +98,16 @@ public class UsersController(IUserService userService, ILogger<UsersController> 
     {
         logger.LogInformation("Registration attempt for nickname: {Nickname}", registrationDto.Nickname);
 
-        try
-        {
-            var tokenPair = await userService.RegisterAsync(registrationDto);
-            logger.LogInformation("User {Nickname} registered successfully", registrationDto.Nickname);
-            return Ok(tokenPair);
-        }
-        catch (InvalidOperationException ex)
-        {
-            logger.LogWarning("Registration failed for {Nickname}: {Message}", registrationDto.Nickname, ex.Message);
-            return BadRequest(new
+        var result = await mediator.Send(new RegisterUserCommand(registrationDto));
+
+        return result.Match(
+            tokenPair =>
             {
-                message = ex.Message
-            });
-        }
+                logger.LogInformation("User {Nickname} registered successfully", registrationDto.Nickname);
+                return Ok(tokenPair);
+            },
+            errors => Problem(errors)
+        );
     }
 
     [HttpPost("login")]
@@ -90,24 +115,38 @@ public class UsersController(IUserService userService, ILogger<UsersController> 
     {
         logger.LogInformation("Login attempt for user: {Nickname}", loginDto.Nickname);
 
-        try
-        {
-            var tokenPair = await userService.LoginAsync(loginDto.Nickname, loginDto.Password);
-            logger.LogInformation("User {Nickname} logged in successfully", loginDto.Nickname);
-            return Ok(tokenPair);
-        }
-        catch (AuthenticationException ex)
-        {
-            logger.LogWarning("Unauthorized login attempt for user: {Nickname}. Reason: {Message}", loginDto.Nickname, ex.Message);
-            return Unauthorized(new
+        var result = await mediator.Send(new LoginUserCommand(loginDto.Nickname, loginDto.Password));
+
+        return result.Match(
+            tokenPair =>
             {
-                message = ex.Message
-            });
-        }
-        catch (Exception ex)
+                logger.LogInformation("User {Nickname} logged in successfully", loginDto.Nickname);
+                return Ok(tokenPair);
+            },
+            errors => Problem(errors)
+        );
+    }
+
+
+    private IActionResult Problem(List<Error> errors)
+    {
+        if (errors.Count == 0)
         {
-            logger.LogError(ex, "Unexpected error during login for user: {Nickname}", loginDto.Nickname);
-            return Problem("An internal error occurred.");
+            return Problem();
         }
+
+        var firstError = errors.First();
+
+        var statusCode = firstError.Type switch
+        {
+            ErrorType.NotFound => StatusCodes.Status404NotFound,
+            ErrorType.Validation => StatusCodes.Status400BadRequest,
+            ErrorType.Conflict => StatusCodes.Status409Conflict,
+            ErrorType.Unauthorized => StatusCodes.Status401Unauthorized,
+            ErrorType.Forbidden => StatusCodes.Status403Forbidden,
+            _ => StatusCodes.Status500InternalServerError
+        };
+
+        return Problem(statusCode: statusCode, title: firstError.Description);
     }
 }

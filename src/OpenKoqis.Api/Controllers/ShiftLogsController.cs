@@ -1,39 +1,48 @@
+using ErrorOr;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using OpenKoqis.Application.Services;
+using OpenKoqis.Application.Features.ShiftLogs.Commands;
+using OpenKoqis.Application.Features.ShiftLogs.Queries;
 using OpenKoqis.Domain.Models;
 
 namespace OpenKoqis.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class ShiftLogsController(IShiftLogService shiftLogService, ILogger<ShiftLogsController> logger) : ControllerBase
+public class ShiftLogsController(ISender mediator, ILogger<ShiftLogsController> logger) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<List<ShiftLog>>> GetAsync()
+    public async Task<IActionResult> GetAsync()
     {
         logger.LogInformation("Request received: Get all shift logs");
 
-        var shifts = await shiftLogService.GetAllAsync();
+        var result = await mediator.Send(new GetAllShiftLogsQuery());
 
-        logger.LogInformation("Successfully retrieved {Count} shifts", shifts.Count);
-        return Ok(shifts);
+        return result.Match(
+            shifts =>
+            {
+                logger.LogInformation("Successfully retrieved {Count} shifts", shifts.Count);
+                return Ok(shifts);
+            },
+            errors => Problem(errors)
+        );
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<ShiftLog>> GetByIdAsync(string id)
+    public async Task<IActionResult> GetByIdAsync(string id)
     {
         logger.LogInformation("Request received: Get shift log with ID: {Id}", id);
 
-        var shift = await shiftLogService.GetByIdAsync(id);
+        var result = await mediator.Send(new GetShiftLogByIdQuery(id));
 
-        if (shift == null)
-        {
-            logger.LogWarning("Shift log with ID: {Id} was not found", id);
-            return NotFound();
-        }
-
-        logger.LogInformation("Successfully retrieved shift log for User: {UserId}", shift.UserId);
-        return Ok(shift);
+        return result.Match(
+            shift =>
+            {
+                logger.LogInformation("Successfully retrieved shift log for User: {UserId}", shift.UserId);
+                return Ok(shift);
+            },
+            errors => Problem(errors)
+        );
     }
 
     public class StartShiftRequest
@@ -42,24 +51,20 @@ public class ShiftLogsController(IShiftLogService shiftLogService, ILogger<Shift
     }
 
     [HttpPost("start")]
-    public async Task<ActionResult<ShiftLog>> StartAsync([FromBody] StartShiftRequest req)
+    public async Task<IActionResult> StartAsync([FromBody] StartShiftRequest req)
     {
         logger.LogInformation("Attempting to start a new shift for User: {UserId}", req.UserId);
 
-        try
-        {
-            var created = await shiftLogService.StartShiftAsync(req.UserId);
-            logger.LogInformation("Shift started successfully. Assigned ID: {ShiftId}", created.Id);
-            return CreatedAtAction(nameof(GetByIdAsync), new
+        var result = await mediator.Send(new StartShiftCommand(req.UserId));
+
+        return result.Match(
+            created =>
             {
-                id = created.Id
-            }, created);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to start shift for User: {UserId}", req.UserId);
-            return Problem(detail: ex.Message);
-        }
+                logger.LogInformation("Shift started successfully. Assigned ID: {ShiftId}", created.Id);
+                return CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id }, created);
+            },
+            errors => Problem(errors)
+        );
     }
 
     public class EndShiftRequest
@@ -75,23 +80,23 @@ public class ShiftLogsController(IShiftLogService shiftLogService, ILogger<Shift
     {
         logger.LogInformation("Attempting to end shift ID: {Id}. Distance: {Distance}km", id, req.DistanceKm);
 
-        try
-        {
-            await shiftLogService.EndShiftAsync(
-                id,
-                req.EndedAt ?? default,
-                req.CleanedBinIds ?? Enumerable.Empty<string>(),
-                req.DistanceKm,
-                req.Route);
+        var command = new EndShiftCommand(
+            id,
+            req.EndedAt ?? default,
+            req.CleanedBinIds ?? Enumerable.Empty<string>(),
+            req.DistanceKm,
+            req.Route);
 
-            logger.LogInformation("Shift ID: {Id} ended successfully", id);
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error occurred while ending shift ID: {Id}", id);
-            return Problem(detail: ex.Message);
-        }
+        var result = await mediator.Send(command);
+
+        return result.Match(
+            _ =>
+            {
+                logger.LogInformation("Shift ID: {Id} ended successfully", id);
+                return NoContent();
+            },
+            errors => Problem(errors)
+        );
     }
 
     [HttpDelete("{id}")]
@@ -99,9 +104,38 @@ public class ShiftLogsController(IShiftLogService shiftLogService, ILogger<Shift
     {
         logger.LogInformation("Request to delete shift log ID: {Id}", id);
 
-        await shiftLogService.DeleteAsync(id);
+        var result = await mediator.Send(new DeleteShiftLogCommand(id));
 
-        logger.LogInformation("Shift log ID: {Id} deleted (if it existed)", id);
-        return NoContent();
+        return result.Match(
+            _ =>
+            {
+                logger.LogInformation("Shift log ID: {Id} deleted successfully", id);
+                return NoContent();
+            },
+            errors => Problem(errors)
+        );
+    }
+
+
+    private IActionResult Problem(List<Error> errors)
+    {
+        if (errors.Count == 0)
+        {
+            return Problem();
+        }
+
+        var firstError = errors.First();
+
+        var statusCode = firstError.Type switch
+        {
+            ErrorType.NotFound => StatusCodes.Status404NotFound,
+            ErrorType.Validation => StatusCodes.Status400BadRequest,
+            ErrorType.Conflict => StatusCodes.Status409Conflict,
+            ErrorType.Unauthorized => StatusCodes.Status401Unauthorized,
+            ErrorType.Forbidden => StatusCodes.Status403Forbidden,
+            _ => StatusCodes.Status500InternalServerError
+        };
+
+        return Problem(statusCode: statusCode, title: firstError.Description);
     }
 }

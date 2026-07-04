@@ -1,58 +1,57 @@
+using ErrorOr;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using OpenKoqis.Application.Services;
+using OpenKoqis.Application.Features.CleaningLogs.Commands;
+using OpenKoqis.Application.Features.CleaningLogs.Queries;
 using OpenKoqis.Domain.Models;
 
 namespace OpenKoqis.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class CleaningLogsController(
-    ICleaningLogService cleaningLogService,
-    ILogger<CleaningLogsController> logger) : ControllerBase
+public class CleaningLogsController(ISender mediator, ILogger<CleaningLogsController> logger) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<List<CleaningLog>>> GetAsync()
+    public async Task<IActionResult> GetAsync()
     {
         logger.LogInformation("Fetching all cleaning logs at {Time}", DateTime.UtcNow);
-        var logs = await cleaningLogService.GetAllAsync();
-        logger.LogDebug("Retrieved {Count} logs from database", logs.Count);
-        return Ok(logs);
+
+        var result = await mediator.Send(new GetAllCleaningLogsQuery());
+
+        return result.Match(
+            logs => Ok(logs),
+            errors => Problem(errors)
+        );
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<CleaningLog>> GetByIdAsync(string id)
+    public async Task<IActionResult> GetByIdAsync(string id)
     {
         logger.LogInformation("Requested cleaning log with ID: {LogId}", id);
-        var log = await cleaningLogService.GetByIdAsync(id);
 
-        if (log == null)
-        {
-            logger.LogWarning("Cleaning log {LogId} not found", id);
-            return NotFound();
-        }
+        var result = await mediator.Send(new GetCleaningLogByIdQuery(id));
 
-        return Ok(log);
+        return result.Match(
+            log => Ok(log),
+            errors => Problem(errors)
+        );
     }
 
     [HttpPost]
-    public async Task<ActionResult<CleaningLog>> PostAsync([FromBody] CleaningLog log)
+    public async Task<IActionResult> PostAsync([FromBody] CleaningLog log)
     {
         logger.LogInformation("Creating a new manual cleaning log entry");
 
-        try
-        {
-            var created = await cleaningLogService.CreateAsync(log);
-            logger.LogInformation("Successfully created log with ID: {LogId}", created.Id);
-            return CreatedAtAction(nameof(GetByIdAsync), new
+        var result = await mediator.Send(new CreateCleaningLogCommand(log));
+
+        return result.Match(
+            created =>
             {
-                id = created.Id
-            }, created);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error occurred while creating manual cleaning log");
-            return Problem("Failed to create cleaning log");
-        }
+                logger.LogInformation("Successfully created log with ID: {LogId}", created.Id);
+                return CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id }, created);
+            },
+            errors => Problem(errors)
+        );
     }
 
     [HttpDelete("{id}")]
@@ -60,17 +59,12 @@ public class CleaningLogsController(
     {
         logger.LogWarning("Request to DELETE cleaning log: {LogId}", id);
 
-        try
-        {
-            await cleaningLogService.DeleteAsync(id);
-            logger.LogInformation("Deleted cleaning log {LogId} successfully", id);
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error deleting cleaning log {LogId}", id);
-            return Problem("Error during deletion");
-        }
+        var result = await mediator.Send(new DeleteCleaningLogCommand(id));
+
+        return result.Match(
+            _ => NoContent(),
+            errors => Problem(errors)
+        );
     }
 
     public class LogCleaningRequest
@@ -82,28 +76,43 @@ public class CleaningLogsController(
     }
 
     [HttpPost("log")]
-    public async Task<ActionResult<CleaningLog>> LogCleaningAsync([FromBody] LogCleaningRequest req)
+    public async Task<IActionResult> LogCleaningAsync([FromBody] LogCleaningRequest req)
     {
         logger.LogInformation("Domain Action: Logging cleaning process for Bin: {BinId} by User: {UserId}", req.BinId, req.UserId);
 
-        try
-        {
-            var created = await cleaningLogService.LogCleaningAsync(req.BinId, req.UserId, req.RemovedKg, req.Notes);
-            logger.LogInformation("Domain Action Success: Bin {BinId} cleaned, removed {Weight}kg", req.BinId, req.RemovedKg);
-            return CreatedAtAction(nameof(GetByIdAsync), new
+        var command = new LogBinCleaningCommand(req.BinId, req.UserId, req.RemovedKg, req.Notes);
+        var result = await mediator.Send(command);
+
+        return result.Match(
+            created =>
             {
-                id = created.Id
-            }, created);
-        }
-        catch (KeyNotFoundException ex)
+                logger.LogInformation("Domain Action Success: Bin {BinId} cleaned, removed {Weight}kg", req.BinId, req.RemovedKg);
+                return CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id }, created);
+            },
+            errors => Problem(errors)
+        );
+    }
+
+
+    private IActionResult Problem(List<Error> errors)
+    {
+        if (errors.Count == 0)
         {
-            logger.LogWarning("Domain Action Failed: Bin {BinId} does not exist. {Message}", req.BinId, ex.Message);
-            return NotFound(ex.Message);
+            return Problem();
         }
-        catch (Exception ex)
+
+        var firstError = errors.First();
+
+        var statusCode = firstError.Type switch
         {
-            logger.LogCritical(ex, "CRITICAL: Unexpected error during LogCleaningAsync for Bin {BinId}", req.BinId);
-            return Problem("A critical error occurred while processing the cleaning log.");
-        }
+            ErrorType.NotFound => StatusCodes.Status404NotFound,
+            ErrorType.Validation => StatusCodes.Status400BadRequest,
+            ErrorType.Conflict => StatusCodes.Status409Conflict,
+            ErrorType.Unauthorized => StatusCodes.Status401Unauthorized,
+            ErrorType.Forbidden => StatusCodes.Status403Forbidden,
+            _ => StatusCodes.Status500InternalServerError
+        };
+
+        return Problem(statusCode: statusCode, title: firstError.Description);
     }
 }

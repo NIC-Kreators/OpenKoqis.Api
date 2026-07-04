@@ -1,68 +1,70 @@
 using Bogus;
+using ErrorOr;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using OpenKoqis.Application.Services;
+using OpenKoqis.Application.Features.Alerts.Commands;
+using OpenKoqis.Application.Features.Bins.Commands;
+using OpenKoqis.Application.Features.Bins.Queries;
 using OpenKoqis.Domain.Models;
 
 namespace OpenKoqis.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class BinsController(
-    IBinService binService,
-    IAlertService alertService,
-    ILogger<BinsController> logger) : ControllerBase
+public class BinsController(ISender mediator, ILogger<BinsController> logger) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<List<Bin>>> GetAsync([FromQuery] BinStatus? status = null, [FromQuery] int? minFillLevel = null)
+    public async Task<IActionResult> GetAsync([FromQuery] BinStatus? status = null, [FromQuery] int? minFillLevel = null)
     {
         logger.LogInformation("Fetching bins with filters: Status={Status}, MinFill={MinFill}", status, minFillLevel);
 
-        var bins = await binService.GetAllAsync();
+        var result = await mediator.Send(new GetAllBinsQuery());
 
-        if (status.HasValue)
-            bins = bins.Where(b => b.Status == status.Value).ToList();
+        return result.Match(
+            bins =>
+            {
+                if (status.HasValue)
+                    bins = bins.Where(b => b.Status == status.Value).ToList();
 
-        if (minFillLevel.HasValue)
-            bins = bins.Where(b => b.Telemetry.FillLevel >= minFillLevel.Value).ToList();
+                if (minFillLevel.HasValue)
+                    bins = bins.Where(b => b.Telemetry.FillLevel >= minFillLevel.Value).ToList();
 
-        logger.LogDebug("Successfully retrieved {Count} bins after filtering", bins.Count);
-        return Ok(bins);
+                logger.LogDebug("Successfully retrieved {Count} bins after filtering", bins.Count);
+                return Ok(bins);
+            },
+            errors => Problem(errors)
+        );
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<Bin>> GetByIdAsync(string id)
+    public async Task<IActionResult> GetByIdAsync(string id)
     {
         logger.LogInformation("Getting bin details for ID: {BinId}", id);
-        var bin = await binService.GetByIdAsync(id);
 
-        if (bin == null)
-        {
-            logger.LogWarning("Bin with ID: {BinId} not found", id);
-            return NotFound();
-        }
+        var result = await mediator.Send(new GetBinByIdQuery(id));
 
-        return Ok(bin);
+        return result.Match(
+            bin => Ok(bin),
+            errors => Problem(errors)
+        );
     }
 
     [HttpPost]
-    public async Task<ActionResult<Bin>> PostAsync([FromBody] Bin bin)
+    public async Task<IActionResult> PostAsync([FromBody] Bin bin)
     {
         logger.LogInformation("Creating a new bin of type {Type}", bin.Type);
 
-        try
-        {
-            var created = await binService.CreateAsync(bin);
-            logger.LogInformation("Successfully created bin with ID: {BinId}", created.Id);
-            return CreatedAtAction(nameof(GetByIdAsync), new
+        var command = new CreateBinCommand(bin.Type, bin.Location, bin.Telemetry, bin.Status);
+        var result = await mediator.Send(command);
+
+        return result.Match(
+            created =>
             {
-                id = created.Id.ToString()
-            }, created);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error occurred while creating a new bin");
-            return Problem(detail: ex.Message);
-        }
+                logger.LogInformation("Successfully created bin with ID: {BinId}", created.Id);
+                return CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id.ToString() }, created);
+            },
+            errors => Problem(errors)
+        );
     }
 
     [HttpPost("{id}/telemetry")]
@@ -70,50 +72,45 @@ public class BinsController(
     {
         logger.LogInformation("Received telemetry update for Bin: {BinId}. FillLevel: {Fill}%", id, telemetry.FillLevel);
 
-        try
+        var updateResult = await mediator.Send(new UpdateBinTelemetryCommand(id, telemetry));
+        if (updateResult.IsError)
         {
-            telemetry.LastUpdated = telemetry.LastUpdated == default ? DateTime.UtcNow : telemetry.LastUpdated;
-
-            await binService.UpdateTelemetryAsync(id, telemetry);
-            await binService.UpdateTelemetryHistoryAsync(id, telemetry);
-
-
-            if (telemetry.IsSmokeDetected)
-            {
-                logger.LogCritical("SMOKE DETECTED in Bin: {BinId}!", id);
-                await alertService.CreateAsync(new Alert
-                {
-                    BinId = id,
-                    Type = AlertType.Smoke,
-                    Severity = AlertSeverity.Critical,
-                    Message = "Danger! Smoke detected in the bin."
-                });
-            }
-
-            if (telemetry.FillLevel >= 90)
-            {
-                logger.LogWarning("Bin {BinId} is almost full: {Level}%", id, telemetry.FillLevel);
-                await alertService.CreateAsync(new Alert
-                {
-                    BinId = id,
-                    Type = AlertType.Fullness,
-                    Severity = telemetry.FillLevel >= 100 ? AlertSeverity.Critical : AlertSeverity.Warning,
-                    Message = $"Container fill level at {telemetry.FillLevel}%"
-                });
-            }
-
-            return NoContent();
+            logger.LogWarning("Failed to update telemetry for Bin: {BinId}", id);
+            return Problem(updateResult.Errors);
         }
-        catch (KeyNotFoundException)
+
+        var historyResult = await mediator.Send(new UpdateBinTelemetryHistoryCommand(id, telemetry));
+        if (historyResult.IsError)
         {
-            logger.LogWarning("Attempted to update telemetry for non-existent Bin: {BinId}", id);
-            return NotFound();
+            logger.LogWarning("Failed to update telemetry history for Bin: {BinId}", id);
+            return Problem(historyResult.Errors);
         }
-        catch (Exception ex)
+
+        if (telemetry.IsSmokeDetected)
         {
-            logger.LogError(ex, "Failed to update telemetry for Bin: {BinId}", id);
-            return Problem(detail: ex.Message);
+            logger.LogCritical("SMOKE DETECTED in Bin: {BinId}!", id);
+            await mediator.Send(new CreateAlertCommand(
+                BinId: id,
+                Type: AlertType.Smoke,
+                Severity: AlertSeverity.Critical,
+                Message: "Danger! Smoke detected in the bin.",
+                ValueAtTime: null));
         }
+
+        if (telemetry.FillLevel >= 90)
+        {
+            logger.LogWarning("Bin {BinId} is almost full: {Level}%", id, telemetry.FillLevel);
+            var severity = telemetry.FillLevel >= 100 ? AlertSeverity.Critical : AlertSeverity.Warning;
+
+            await mediator.Send(new CreateAlertCommand(
+                BinId: id,
+                Type: AlertType.Fullness,
+                Severity: severity,
+                Message: $"Container fill level at {telemetry.FillLevel}%",
+                ValueAtTime: telemetry.FillLevel.ToString()));
+        }
+
+        return NoContent();
     }
 
     [HttpPost("seed/{count}")]
@@ -140,19 +137,46 @@ public class BinsController(
             .RuleFor(b => b.UpdatedAt, f => DateTime.UtcNow);
 
         var fakeBins = binFaker.Generate(count);
-
         int successCount = 0;
 
         foreach (var bin in fakeBins)
         {
-            await binService.CreateAsync(bin);
-            successCount++;
+            var command = new CreateBinCommand(bin.Type, bin.Location, bin.Telemetry, bin.Status);
+            var result = await mediator.Send(command);
+
+            if (!result.IsError)
+            {
+                successCount++;
+            }
         }
 
         logger.LogInformation("Seed completed. Created {Success} out of {Total} bins", successCount, count);
         return Ok(new
         {
-            message = $"Successfully seeded {count} bins in Almaty region"
+            message = $"Successfully seeded {successCount} bins in Almaty region"
         });
+    }
+
+
+    private IActionResult Problem(List<Error> errors)
+    {
+        if (errors.Count == 0)
+        {
+            return Problem();
+        }
+
+        var firstError = errors.First();
+
+        var statusCode = firstError.Type switch
+        {
+            ErrorType.NotFound => StatusCodes.Status404NotFound,
+            ErrorType.Validation => StatusCodes.Status400BadRequest,
+            ErrorType.Conflict => StatusCodes.Status409Conflict,
+            ErrorType.Unauthorized => StatusCodes.Status401Unauthorized,
+            ErrorType.Forbidden => StatusCodes.Status403Forbidden,
+            _ => StatusCodes.Status500InternalServerError
+        };
+
+        return Problem(statusCode: statusCode, title: firstError.Description);
     }
 }
