@@ -3,6 +3,8 @@ using OpenKoqis.Api.Extensions;
 using OpenKoqis.Api.Mqtt;
 using OpenKoqis.Application.Services;
 using OpenKoqis.Infrastructure.Services;
+using MediatR;
+using OpenKoqis.Application.Features.Users.Queries;
 using Scalar.AspNetCore;
 using Serilog;
 
@@ -23,7 +25,8 @@ builder.Services.AddAuthorizationSecPolicies();
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
-
+builder.Services.AddMediatR(cfg =>
+    cfg.RegisterServicesFromAssembly(typeof(GetAllUsersQuery).Assembly));
 builder.Services
     .AddScoped<MqttClientService>()
     .AddScoped<IUserService, UserService>()

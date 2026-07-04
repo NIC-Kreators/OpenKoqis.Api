@@ -10,6 +10,9 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <PackageReference Include="ErrorOr" Version="2.1.1" />
+      <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
+      <PackageReference Include="MediatR" Version="14.2.0" />
       <PackageReference Include="MongoDB.Driver" Version="3.8.0" />
     </ItemGroup>
 
