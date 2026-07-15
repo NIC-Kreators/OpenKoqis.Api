@@ -8,30 +8,23 @@ namespace OpenKoqis.Application.Features.ShiftLogs.Queries;
 
 public record GetShiftLogByIdQuery(string Id) : IRequest<ErrorOr<ShiftLog>>;
 
-public class GetShiftLogByIdQueryHandler : IRequestHandler<GetShiftLogByIdQuery, ErrorOr<ShiftLog>>
+public class GetShiftLogByIdQueryHandler(IMongoDatabase database, ILogger<GetShiftLogByIdQueryHandler> logger) : IRequestHandler<GetShiftLogByIdQuery, ErrorOr<ShiftLog>>
 {
-    private readonly IMongoCollection<ShiftLog> _collection;
-    private readonly ILogger<GetShiftLogByIdQueryHandler> _logger;
-
-    public GetShiftLogByIdQueryHandler(IMongoDatabase database, ILogger<GetShiftLogByIdQueryHandler> logger)
-    {
-        _collection = database.GetCollection<ShiftLog>("ShiftLogs");
-        _logger = logger;
-    }
-
+    private readonly IMongoCollection<ShiftLog> _collection = database.GetCollection<ShiftLog>("ShiftLogs");
+   
     public async Task<ErrorOr<ShiftLog>> Handle(GetShiftLogByIdQuery request, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Searching for shift log with ID: {Id}", request.Id);
+        logger.LogInformation("Searching for shift log with ID: {Id}", request.Id);
 
         var log = await _collection.Find(s => s.Id == request.Id).FirstOrDefaultAsync(cancellationToken);
 
-        if (log == null)
+        if (log is null)
         {
-            _logger.LogWarning("Shift log with ID: {Id} was not found", request.Id);
+            logger.LogWarning("Shift log with ID: {Id} was not found", request.Id);
             return ShiftLogErrors.NotFound(request.Id);
         }
 
-        _logger.LogInformation("Shift log with ID: {Id} found", request.Id);
+        logger.LogInformation("Shift log with ID: {Id} found", request.Id);
         return log;
     }
 }

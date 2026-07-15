@@ -10,38 +10,23 @@ namespace OpenKoqis.Application.Features.Users.Commands;
 
 public record RegisterUserCommand(UserRegistrationDto RegistrationDto) : IRequest<ErrorOr<TokenPair>>;
 
-public class RegisterUserCommandHandler : IRequestHandler<RegisterUserCommand, ErrorOr<TokenPair>>
+public class RegisterUserCommandHandler(IMongoDatabase database, IJwtService jwtService, IPasswordHasher passwordHasher, ILogger<LoginUserCommandHandler> logger) : IRequestHandler<RegisterUserCommand, ErrorOr<TokenPair>>
 {
-    private readonly IMongoCollection<User> _collection;
-    private readonly IJwtService _jwtService;
-    private readonly IPasswordHasher _passwordHasher;
-    private readonly ILogger<RegisterUserCommandHandler> _logger;
-
-    public RegisterUserCommandHandler(
-        IMongoDatabase database,
-        IJwtService jwtService,
-        IPasswordHasher passwordHasher,
-        ILogger<RegisterUserCommandHandler> logger)
-    {
-        _collection = database.GetCollection<User>("Users");
-        _jwtService = jwtService;
-        _passwordHasher = passwordHasher;
-        _logger = logger;
-    }
+    private readonly IMongoCollection<User> _collection = database.GetCollection<User>("Users");
 
     public async Task<ErrorOr<TokenPair>> Handle(RegisterUserCommand request, CancellationToken cancellationToken)
     {
         var dto = request.RegistrationDto;
-        _logger.LogInformation("Starting registration process for Nickname: {Nickname}", dto.Nickname);
+        logger.LogInformation("Starting registration process for Nickname: {Nickname}", dto.Nickname);
 
         var existingUser = await _collection.Find(u => u.Nickname == dto.Nickname).FirstOrDefaultAsync(cancellationToken);
-        if (existingUser != null)
+        if (existingUser is not null)
         {
-            _logger.LogWarning("Registration failed. Nickname {Nickname} is already taken", dto.Nickname);
+            logger.LogWarning("Registration failed. Nickname {Nickname} is already taken", dto.Nickname);
             return UserErrors.NicknameConflict(dto.Nickname);
         }
 
-        string hashedPassword = _passwordHasher.HashPassword(dto.Password);
+        string hashedPassword = passwordHasher.HashPassword(dto.Password);
 
         var newUser = new User
         {
@@ -56,9 +41,9 @@ public class RegisterUserCommandHandler : IRequestHandler<RegisterUserCommand, E
         };
 
         await _collection.InsertOneAsync(newUser, cancellationToken: cancellationToken);
-        _logger.LogInformation("User {Nickname} registered and saved with ID: {UserId}", newUser.Nickname, newUser.Id);
+        logger.LogInformation("User {Nickname} registered and saved with ID: {UserId}", newUser.Nickname, newUser.Id);
 
-        var tokenPair = await _jwtService.GenerateTokenPairAsync(newUser.Id, newUser.Nickname, newUser.Role);
+        var tokenPair = await jwtService.GenerateTokenPairAsync(newUser.Id, newUser.Nickname, newUser.Role);
         return tokenPair;
     }
 }

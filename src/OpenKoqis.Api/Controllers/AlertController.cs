@@ -9,7 +9,7 @@ namespace OpenKoqis.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class AlertsController(ISender sender, ILogger<AlertsController> logger) : ControllerBase
+public class AlertsController(ISender sender, ILogger<AlertsController> logger) : ApiController
 {
     [HttpGet]
     public async Task<IActionResult> GetAllAsync()
@@ -18,10 +18,7 @@ public class AlertsController(ISender sender, ILogger<AlertsController> logger) 
 
         var result = await sender.Send(new GetAllAlertsQuery());
 
-        return result.Match(
-            alerts => Ok(alerts),
-            errors => Problem(errors)
-        );
+        return result.Match(Ok, HandleErrors);
     }
 
     [HttpGet("active")]
@@ -31,10 +28,7 @@ public class AlertsController(ISender sender, ILogger<AlertsController> logger) 
 
         var result = await sender.Send(new GetActiveAlertsQuery());
 
-        return result.Match(
-            alerts => Ok(alerts),
-            errors => Problem(errors)
-        );
+        return result.Match(Ok, HandleErrors);
     }
 
     [HttpGet("bin/{binId}")]
@@ -48,7 +42,7 @@ public class AlertsController(ISender sender, ILogger<AlertsController> logger) 
             alerts => alerts.Count == 0
                 ? NotFound($"No alerts found for bin with ID {binId}")
                 : Ok(alerts),
-            errors => Problem(errors)
+            HandleErrors
         );
     }
 
@@ -59,10 +53,7 @@ public class AlertsController(ISender sender, ILogger<AlertsController> logger) 
 
         var result = await sender.Send(new ResolveAlertCommand(id));
 
-        return result.Match(
-            _ => NoContent(),
-            errors => Problem(errors)
-        );
+        return result.Match(_ => NoContent(), HandleErrors);
     }
 
     [HttpDelete("{id}")]
@@ -72,32 +63,6 @@ public class AlertsController(ISender sender, ILogger<AlertsController> logger) 
 
         var result = await sender.Send(new DeleteAlertCommand(id));
 
-        return result.Match(
-            _ => NoContent(),
-            errors => Problem(errors)
-        );
-    }
-
-
-    private IActionResult Problem(List<Error> errors)
-    {
-        if (errors.Count == 0)
-        {
-            return Problem();
-        }
-
-        var firstError = errors.First();
-
-        var statusCode = firstError.Type switch
-        {
-            ErrorType.NotFound => StatusCodes.Status404NotFound,
-            ErrorType.Validation => StatusCodes.Status400BadRequest,
-            ErrorType.Conflict => StatusCodes.Status409Conflict,
-            ErrorType.Unauthorized => StatusCodes.Status401Unauthorized,
-            ErrorType.Forbidden => StatusCodes.Status403Forbidden,
-            _ => StatusCodes.Status500InternalServerError
-        };
-
-        return Problem(statusCode: statusCode, title: firstError.Description);
+        return result.Match(_ => NoContent(), HandleErrors);
     }
 }

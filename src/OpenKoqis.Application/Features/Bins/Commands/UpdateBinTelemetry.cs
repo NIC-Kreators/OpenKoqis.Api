@@ -8,20 +8,13 @@ namespace OpenKoqis.Application.Features.Bins.Commands;
 
 public record UpdateBinTelemetryCommand(string BinId, BinTelemetry Telemetry) : IRequest<ErrorOr<Success>>;
 
-public class UpdateBinTelemetryCommandHandler : IRequestHandler<UpdateBinTelemetryCommand, ErrorOr<Success>>
+public class UpdateBinTelemetryCommandHandler(IMongoDatabase database, ILogger<UpdateBinTelemetryCommandHandler> logger) : IRequestHandler<UpdateBinTelemetryCommand, ErrorOr<Success>>
 {
-    private readonly IMongoCollection<Bin> _collection;
-    private readonly ILogger<UpdateBinTelemetryCommandHandler> _logger;
-
-    public UpdateBinTelemetryCommandHandler(IMongoDatabase database, ILogger<UpdateBinTelemetryCommandHandler> logger)
-    {
-        _collection = database.GetCollection<Bin>("Bins");
-        _logger = logger;
-    }
+    private readonly IMongoCollection<Bin> _collection = database.GetCollection<Bin>("Bins");
 
     public async Task<ErrorOr<Success>> Handle(UpdateBinTelemetryCommand request, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Updating current telemetry for bin {BinId}", request.BinId);
+        logger.LogInformation("Updating current telemetry for bin {BinId}", request.BinId);
 
         var telemetry = request.Telemetry;
         telemetry.LastUpdated = telemetry.LastUpdated == default ? DateTime.UtcNow : telemetry.LastUpdated;
@@ -35,11 +28,11 @@ public class UpdateBinTelemetryCommandHandler : IRequestHandler<UpdateBinTelemet
 
         if (result.MatchedCount == 0)
         {
-            _logger.LogWarning("Telemetry update failed. Bin '{BinId}' not found", request.BinId);
+            logger.LogWarning("Telemetry update failed. Bin '{BinId}' not found", request.BinId);
             return BinErrors.NotFound(request.BinId);
         }
 
-        _logger.LogInformation("Current telemetry for bin {BinId} updated. Fill level: {FillLevel}%", request.BinId, telemetry.FillLevel);
+        logger.LogInformation("Current telemetry for bin {BinId} updated. Fill level: {FillLevel}%", request.BinId, telemetry.FillLevel);
         return Result.Success;
     }
 }

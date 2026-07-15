@@ -8,25 +8,18 @@ namespace OpenKoqis.Application.Features.Users.Commands;
 
 public record UpdateUserCommand(string Id, User User) : IRequest<ErrorOr<Updated>>;
 
-public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, ErrorOr<Updated>>
+public class UpdateUserCommandHandler(IMongoDatabase database, ILogger<UpdateUserCommandHandler> logger) : IRequestHandler<UpdateUserCommand, ErrorOr<Updated>>
 {
-    private readonly IMongoCollection<User> _collection;
-    private readonly ILogger<UpdateUserCommandHandler> _logger;
-
-    public UpdateUserCommandHandler(IMongoDatabase database, ILogger<UpdateUserCommandHandler> logger)
-    {
-        _collection = database.GetCollection<User>("Users");
-        _logger = logger;
-    }
+    private readonly IMongoCollection<User> _collection = database.GetCollection<User>("Users");
 
     public async Task<ErrorOr<Updated>> Handle(UpdateUserCommand request, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Updating user with ID: {UserId}", request.Id);
+        logger.LogInformation("Updating user with ID: {UserId}", request.Id);
 
         var existing = await _collection.Find(u => u.Id == request.Id).FirstOrDefaultAsync(cancellationToken);
-        if (existing == null)
+        if (existing is null)
         {
-            _logger.LogWarning("Update failed. User '{UserId}' not found", request.Id);
+            logger.LogWarning("Update failed. User '{UserId}' not found", request.Id);
             return UserErrors.NotFound(request.Id);
         }
 
@@ -36,7 +29,7 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, Error
         user.UpdatedAt = DateTime.UtcNow;
 
         await _collection.ReplaceOneAsync(u => u.Id == request.Id, user, cancellationToken: cancellationToken);
-        _logger.LogInformation("User {UserId} successfully updated", request.Id);
+        logger.LogInformation("User {UserId} successfully updated", request.Id);
 
         return Result.Updated;
     }

@@ -9,7 +9,7 @@ namespace OpenKoqis.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class CleaningLogsController(ISender mediator, ILogger<CleaningLogsController> logger) : ControllerBase
+public class CleaningLogsController(ISender mediator, ILogger<CleaningLogsController> logger) : ApiController
 {
     [HttpGet]
     public async Task<IActionResult> GetAsync()
@@ -18,10 +18,7 @@ public class CleaningLogsController(ISender mediator, ILogger<CleaningLogsContro
 
         var result = await mediator.Send(new GetAllCleaningLogsQuery());
 
-        return result.Match(
-            logs => Ok(logs),
-            errors => Problem(errors)
-        );
+        return result.Match(Ok, HandleErrors);
     }
 
     [HttpGet("{id}")]
@@ -31,10 +28,7 @@ public class CleaningLogsController(ISender mediator, ILogger<CleaningLogsContro
 
         var result = await mediator.Send(new GetCleaningLogByIdQuery(id));
 
-        return result.Match(
-            log => Ok(log),
-            errors => Problem(errors)
-        );
+        return result.Match(Ok, HandleErrors);
     }
 
     [HttpPost]
@@ -50,7 +44,7 @@ public class CleaningLogsController(ISender mediator, ILogger<CleaningLogsContro
                 logger.LogInformation("Successfully created log with ID: {LogId}", created.Id);
                 return CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id }, created);
             },
-            errors => Problem(errors)
+            HandleErrors
         );
     }
 
@@ -61,10 +55,7 @@ public class CleaningLogsController(ISender mediator, ILogger<CleaningLogsContro
 
         var result = await mediator.Send(new DeleteCleaningLogCommand(id));
 
-        return result.Match(
-            _ => NoContent(),
-            errors => Problem(errors)
-        );
+        return result.Match(_ => NoContent(), HandleErrors);
     }
 
     public class LogCleaningRequest
@@ -89,30 +80,7 @@ public class CleaningLogsController(ISender mediator, ILogger<CleaningLogsContro
                 logger.LogInformation("Domain Action Success: Bin {BinId} cleaned, removed {Weight}kg", req.BinId, req.RemovedKg);
                 return CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id }, created);
             },
-            errors => Problem(errors)
+            HandleErrors
         );
-    }
-
-
-    private IActionResult Problem(List<Error> errors)
-    {
-        if (errors.Count == 0)
-        {
-            return Problem();
-        }
-
-        var firstError = errors.First();
-
-        var statusCode = firstError.Type switch
-        {
-            ErrorType.NotFound => StatusCodes.Status404NotFound,
-            ErrorType.Validation => StatusCodes.Status400BadRequest,
-            ErrorType.Conflict => StatusCodes.Status409Conflict,
-            ErrorType.Unauthorized => StatusCodes.Status401Unauthorized,
-            ErrorType.Forbidden => StatusCodes.Status403Forbidden,
-            _ => StatusCodes.Status500InternalServerError
-        };
-
-        return Problem(statusCode: statusCode, title: firstError.Description);
     }
 }

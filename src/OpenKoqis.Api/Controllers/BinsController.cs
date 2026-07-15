@@ -11,7 +11,7 @@ namespace OpenKoqis.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class BinsController(ISender mediator, ILogger<BinsController> logger) : ControllerBase
+public class BinsController(ISender mediator, ILogger<BinsController> logger) : ApiController
 {
     [HttpGet]
     public async Task<IActionResult> GetAsync([FromQuery] BinStatus? status = null, [FromQuery] int? minFillLevel = null)
@@ -32,7 +32,7 @@ public class BinsController(ISender mediator, ILogger<BinsController> logger) : 
                 logger.LogDebug("Successfully retrieved {Count} bins after filtering", bins.Count);
                 return Ok(bins);
             },
-            errors => Problem(errors)
+            HandleErrors
         );
     }
 
@@ -43,10 +43,7 @@ public class BinsController(ISender mediator, ILogger<BinsController> logger) : 
 
         var result = await mediator.Send(new GetBinByIdQuery(id));
 
-        return result.Match(
-            bin => Ok(bin),
-            errors => Problem(errors)
-        );
+        return result.Match(Ok, HandleErrors);
     }
 
     [HttpPost]
@@ -63,7 +60,7 @@ public class BinsController(ISender mediator, ILogger<BinsController> logger) : 
                 logger.LogInformation("Successfully created bin with ID: {BinId}", created.Id);
                 return CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id.ToString() }, created);
             },
-            errors => Problem(errors)
+            HandleErrors
         );
     }
 
@@ -76,14 +73,14 @@ public class BinsController(ISender mediator, ILogger<BinsController> logger) : 
         if (updateResult.IsError)
         {
             logger.LogWarning("Failed to update telemetry for Bin: {BinId}", id);
-            return Problem(updateResult.Errors);
+            return HandleErrors(updateResult.Errors);
         }
 
         var historyResult = await mediator.Send(new UpdateBinTelemetryHistoryCommand(id, telemetry));
         if (historyResult.IsError)
         {
             logger.LogWarning("Failed to update telemetry history for Bin: {BinId}", id);
-            return Problem(historyResult.Errors);
+            return HandleErrors(historyResult.Errors);
         }
 
         if (telemetry.IsSmokeDetected)
@@ -155,28 +152,5 @@ public class BinsController(ISender mediator, ILogger<BinsController> logger) : 
         {
             message = $"Successfully seeded {successCount} bins in Almaty region"
         });
-    }
-
-
-    private IActionResult Problem(List<Error> errors)
-    {
-        if (errors.Count == 0)
-        {
-            return Problem();
-        }
-
-        var firstError = errors.First();
-
-        var statusCode = firstError.Type switch
-        {
-            ErrorType.NotFound => StatusCodes.Status404NotFound,
-            ErrorType.Validation => StatusCodes.Status400BadRequest,
-            ErrorType.Conflict => StatusCodes.Status409Conflict,
-            ErrorType.Unauthorized => StatusCodes.Status401Unauthorized,
-            ErrorType.Forbidden => StatusCodes.Status403Forbidden,
-            _ => StatusCodes.Status500InternalServerError
-        };
-
-        return Problem(statusCode: statusCode, title: firstError.Description);
     }
 }

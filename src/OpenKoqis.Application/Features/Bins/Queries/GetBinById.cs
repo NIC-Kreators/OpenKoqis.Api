@@ -8,30 +8,23 @@ namespace OpenKoqis.Application.Features.Bins.Queries;
 
 public record GetBinByIdQuery(string Id) : IRequest<ErrorOr<Bin>>;
 
-public class GetBinByIdQueryHandler : IRequestHandler<GetBinByIdQuery, ErrorOr<Bin>>
+public class GetBinByIdQueryHandler(IMongoDatabase database, ILogger<GetBinByIdQueryHandler> logger) : IRequestHandler<GetBinByIdQuery, ErrorOr<Bin>>
 {
-    private readonly IMongoCollection<Bin> _collection;
-    private readonly ILogger<GetBinByIdQueryHandler> _logger;
-
-    public GetBinByIdQueryHandler(IMongoDatabase database, ILogger<GetBinByIdQueryHandler> logger)
-    {
-        _collection = database.GetCollection<Bin>("Bins");
-        _logger = logger;
-    }
+    private readonly IMongoCollection<Bin> _collection = database.GetCollection<Bin>("Bins");
 
     public async Task<ErrorOr<Bin>> Handle(GetBinByIdQuery request, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Searching for bin with ID: {BinId}", request.Id);
+        logger.LogInformation("Searching for bin with ID: {BinId}", request.Id);
 
         var bin = await _collection.Find(b => b.Id == request.Id).FirstOrDefaultAsync(cancellationToken);
 
-        if (bin == null)
+        if (bin is null)
         {
-            _logger.LogWarning("Bin with ID: {BinId} was not found", request.Id);
+            logger.LogWarning("Bin with ID: {BinId} was not found", request.Id);
             return BinErrors.NotFound(request.Id);
         }
 
-        _logger.LogInformation("Bin {BinId} found", request.Id);
+        logger.LogInformation("Bin {BinId} found", request.Id);
         return bin;
     }
 }

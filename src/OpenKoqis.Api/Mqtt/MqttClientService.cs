@@ -1,4 +1,4 @@
-using System.Text;
+using System.Buffers;
 using System.Text.Json;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,7 +14,6 @@ public class MqttClientService : BackgroundService
     private readonly IMqttClient _client;
     private readonly MqttClientOptions _options;
     private readonly MqttClientSubscribeOptions _subscribeOptions;
-    private readonly IServiceScopeFactory _serviceScopeFactory;
 
     public MqttClientService(
         IConfiguration config,
@@ -22,18 +21,16 @@ public class MqttClientService : BackgroundService
         IServiceScopeFactory serviceScopeFactory)
     {
         _logger = logger;
-        _serviceScopeFactory = serviceScopeFactory;
 
         var factory = new MqttClientFactory();
         _client = factory.CreateMqttClient();
+
         var optionsBuilder = new MqttClientOptionsBuilder()
             .WithTcpServer(config.GetValue<string>("MQTT_HOST"), config.GetValue<int>("MQTT_PORT"))
             .WithClientId(config.GetValue<string>("MQTT_CLIENT_ID"));
-
         _logger.LogDebug("Options for MQTT server is defined");
 
         var isMqttAllowedAnonymous = config.GetValue<bool>("MQTT_ALLOW_ANONYMOUS");
-
         if (!isMqttAllowedAnonymous)
         {
             _logger.LogInformation("MQTT is not allowed anonymous connection. Configure username and password");
@@ -46,10 +43,8 @@ public class MqttClientService : BackgroundService
         _client.ApplicationMessageReceivedAsync += async e =>
         {
             var topic = e.ApplicationMessage.Topic;
-            var payload = Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
-
+            var payload = System.Text.Encoding.UTF8.GetString(e.ApplicationMessage.Payload.ToArray());
             var binId = topic.Split('/')[1];
-
             var telemetry = JsonSerializer.Deserialize<BinTelemetry>(payload);
 
             if (telemetry is null)
@@ -58,9 +53,8 @@ public class MqttClientService : BackgroundService
                 return;
             }
 
-            using var scope = _serviceScopeFactory.CreateScope();
+            using var scope = serviceScopeFactory.CreateScope();
             var mediator = scope.ServiceProvider.GetRequiredService<ISender>();
-
             var command = new UpdateBinTelemetryCommand(binId, telemetry);
             var result = await mediator.Send(command);
 
@@ -73,7 +67,6 @@ public class MqttClientService : BackgroundService
 
         var subscribeOptionsFilter = new MqttClientSubscribeOptionsBuilder();
         var topics = config.GetSection("Mqtt:Topics").Get<string[]>() ?? [];
-
         _logger.LogInformation("Topics for MQTT server are: {Topics}", string.Join(", ", topics));
 
         foreach (var topic in topics)

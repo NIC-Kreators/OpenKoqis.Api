@@ -26,7 +26,7 @@ builder.Services.AddAuthorizationSecPolicies();
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddMediatR(cfg =>
-    cfg.RegisterServicesFromAssembly(typeof(GetAllUsersQuery).Assembly));
+    cfg.RegisterServicesFromAssembly(MediatRConfig.ApplicationAssembly));
 builder.Services
     .AddScoped<MqttClientService>()
     .AddScoped<IJwtService, JwtService>()

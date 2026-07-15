@@ -4,16 +4,12 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace OpenKoqis.Api.Controllers;
 
-[ApiController]
-[Route("api/[controller]")]
 public abstract class ApiController : ControllerBase
 {
-    protected IActionResult Problem(List<Error> errors)
+    protected IActionResult HandleErrors(List<Error> errors)
     {
         if (errors.Count == 0)
-        {
             return Problem();
-        }
 
         var firstError = errors[0];
 

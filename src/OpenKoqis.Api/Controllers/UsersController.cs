@@ -10,7 +10,7 @@ namespace OpenKoqis.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class UsersController(ISender mediator, ILogger<UsersController> logger) : ControllerBase
+public class UsersController(ISender mediator, ILogger<UsersController> logger) : ApiController
 {
     [HttpGet]
     public async Task<IActionResult> GetAsync()
@@ -25,7 +25,7 @@ public class UsersController(ISender mediator, ILogger<UsersController> logger) 
                 logger.LogInformation("Successfully retrieved {Count} users", users.Count);
                 return Ok(users);
             },
-            errors => Problem(errors)
+            HandleErrors
         );
     }
 
@@ -36,10 +36,7 @@ public class UsersController(ISender mediator, ILogger<UsersController> logger) 
 
         var result = await mediator.Send(new GetUserByIdQuery(id));
 
-        return result.Match(
-            user => Ok(user),
-            errors => Problem(errors)
-        );
+        return result.Match(Ok, HandleErrors);
     }
 
     [HttpPost]
@@ -55,7 +52,7 @@ public class UsersController(ISender mediator, ILogger<UsersController> logger) 
                 logger.LogInformation("User created with ID: {UserId}", created.Id);
                 return CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id.ToString() }, created);
             },
-            errors => Problem(errors)
+            HandleErrors
         );
     }
 
@@ -72,7 +69,7 @@ public class UsersController(ISender mediator, ILogger<UsersController> logger) 
                 logger.LogInformation("User {UserId} updated successfully", id);
                 return NoContent();
             },
-            errors => Problem(errors)
+            HandleErrors
         );
     }
 
@@ -89,7 +86,7 @@ public class UsersController(ISender mediator, ILogger<UsersController> logger) 
                 logger.LogInformation("User {UserId} deleted", id);
                 return NoContent();
             },
-            errors => Problem(errors)
+            HandleErrors
         );
     }
 
@@ -106,7 +103,7 @@ public class UsersController(ISender mediator, ILogger<UsersController> logger) 
                 logger.LogInformation("User {Nickname} registered successfully", registrationDto.Nickname);
                 return Ok(tokenPair);
             },
-            errors => Problem(errors)
+            HandleErrors
         );
     }
 
@@ -123,30 +120,7 @@ public class UsersController(ISender mediator, ILogger<UsersController> logger) 
                 logger.LogInformation("User {Nickname} logged in successfully", loginDto.Nickname);
                 return Ok(tokenPair);
             },
-            errors => Problem(errors)
+            HandleErrors
         );
-    }
-
-
-    private IActionResult Problem(List<Error> errors)
-    {
-        if (errors.Count == 0)
-        {
-            return Problem();
-        }
-
-        var firstError = errors.First();
-
-        var statusCode = firstError.Type switch
-        {
-            ErrorType.NotFound => StatusCodes.Status404NotFound,
-            ErrorType.Validation => StatusCodes.Status400BadRequest,
-            ErrorType.Conflict => StatusCodes.Status409Conflict,
-            ErrorType.Unauthorized => StatusCodes.Status401Unauthorized,
-            ErrorType.Forbidden => StatusCodes.Status403Forbidden,
-            _ => StatusCodes.Status500InternalServerError
-        };
-
-        return Problem(statusCode: statusCode, title: firstError.Description);
     }
 }

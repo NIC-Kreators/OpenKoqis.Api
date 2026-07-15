@@ -9,7 +9,7 @@ namespace OpenKoqis.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class ShiftLogsController(ISender mediator, ILogger<ShiftLogsController> logger) : ControllerBase
+public class ShiftLogsController(ISender mediator, ILogger<ShiftLogsController> logger) : ApiController
 {
     [HttpGet]
     public async Task<IActionResult> GetAsync()
@@ -24,7 +24,7 @@ public class ShiftLogsController(ISender mediator, ILogger<ShiftLogsController> 
                 logger.LogInformation("Successfully retrieved {Count} shifts", shifts.Count);
                 return Ok(shifts);
             },
-            errors => Problem(errors)
+            HandleErrors
         );
     }
 
@@ -41,7 +41,7 @@ public class ShiftLogsController(ISender mediator, ILogger<ShiftLogsController> 
                 logger.LogInformation("Successfully retrieved shift log for User: {UserId}", shift.UserId);
                 return Ok(shift);
             },
-            errors => Problem(errors)
+            HandleErrors
         );
     }
 
@@ -63,7 +63,7 @@ public class ShiftLogsController(ISender mediator, ILogger<ShiftLogsController> 
                 logger.LogInformation("Shift started successfully. Assigned ID: {ShiftId}", created.Id);
                 return CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id }, created);
             },
-            errors => Problem(errors)
+            HandleErrors
         );
     }
 
@@ -95,7 +95,7 @@ public class ShiftLogsController(ISender mediator, ILogger<ShiftLogsController> 
                 logger.LogInformation("Shift ID: {Id} ended successfully", id);
                 return NoContent();
             },
-            errors => Problem(errors)
+            HandleErrors
         );
     }
 
@@ -112,30 +112,7 @@ public class ShiftLogsController(ISender mediator, ILogger<ShiftLogsController> 
                 logger.LogInformation("Shift log ID: {Id} deleted successfully", id);
                 return NoContent();
             },
-            errors => Problem(errors)
+            HandleErrors
         );
-    }
-
-
-    private IActionResult Problem(List<Error> errors)
-    {
-        if (errors.Count == 0)
-        {
-            return Problem();
-        }
-
-        var firstError = errors.First();
-
-        var statusCode = firstError.Type switch
-        {
-            ErrorType.NotFound => StatusCodes.Status404NotFound,
-            ErrorType.Validation => StatusCodes.Status400BadRequest,
-            ErrorType.Conflict => StatusCodes.Status409Conflict,
-            ErrorType.Unauthorized => StatusCodes.Status401Unauthorized,
-            ErrorType.Forbidden => StatusCodes.Status403Forbidden,
-            _ => StatusCodes.Status500InternalServerError
-        };
-
-        return Problem(statusCode: statusCode, title: firstError.Description);
     }
 }

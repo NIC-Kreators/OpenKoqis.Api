@@ -8,30 +8,23 @@ namespace OpenKoqis.Application.Features.ShiftLogs.Commands;
 
 public record DeleteShiftLogCommand(string Id) : IRequest<ErrorOr<Deleted>>;
 
-public class DeleteShiftLogCommandHandler : IRequestHandler<DeleteShiftLogCommand, ErrorOr<Deleted>>
+public class DeleteShiftLogCommandHandler(IMongoDatabase database, ILogger<DeleteShiftLogCommandHandler> logger) : IRequestHandler<DeleteShiftLogCommand, ErrorOr<Deleted>>
 {
-    private readonly IMongoCollection<ShiftLog> _collection;
-    private readonly ILogger<DeleteShiftLogCommandHandler> _logger;
-
-    public DeleteShiftLogCommandHandler(IMongoDatabase database, ILogger<DeleteShiftLogCommandHandler> logger)
-    {
-        _collection = database.GetCollection<ShiftLog>("ShiftLogs");
-        _logger = logger;
-    }
+    private readonly IMongoCollection<ShiftLog> _collection = database.GetCollection<ShiftLog>("ShiftLogs");
 
     public async Task<ErrorOr<Deleted>> Handle(DeleteShiftLogCommand request, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Request to delete shift log: {Id}", request.Id);
+        logger.LogInformation("Request to delete shift log: {Id}", request.Id);
 
         var result = await _collection.DeleteOneAsync(s => s.Id == request.Id, cancellationToken);
 
         if (result.DeletedCount == 0)
         {
-            _logger.LogWarning("Delete failed: ShiftLog {Id} not found", request.Id);
+            logger.LogWarning("Delete failed: ShiftLog {Id} not found", request.Id);
             return ShiftLogErrors.NotFound(request.Id);
         }
 
-        _logger.LogInformation("Shift log {Id} deleted successfully", request.Id);
+        logger.LogInformation("Shift log {Id} deleted successfully", request.Id);
         return Result.Deleted;
     }
 }

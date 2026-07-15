@@ -14,27 +14,19 @@ public record EndShiftCommand(
     double DistanceKm,
     string? Route = null) : IRequest<ErrorOr<Success>>;
 
-public class EndShiftCommandHandler : IRequestHandler<EndShiftCommand, ErrorOr<Success>>
+public class EndShiftCommandHandler(IMongoDatabase database, ILogger<EndShiftCommandHandler> logger) : IRequestHandler<EndShiftCommand, ErrorOr<Success>>
 {
-    private readonly IMongoCollection<ShiftLog> _shiftCollection;
-    private readonly IMongoCollection<Bin> _binCollection;
-    private readonly ILogger<EndShiftCommandHandler> _logger;
-
-    public EndShiftCommandHandler(IMongoDatabase database, ILogger<EndShiftCommandHandler> logger)
-    {
-        _shiftCollection = database.GetCollection<ShiftLog>("ShiftLogs");
-        _binCollection = database.GetCollection<Bin>("Bins");
-        _logger = logger;
-    }
+    private readonly IMongoCollection<ShiftLog> _shiftCollection = database.GetCollection<ShiftLog>("ShiftLogs");
+    private readonly IMongoCollection<Bin> _binCollection = database.GetCollection<Bin>("Bins");
 
     public async Task<ErrorOr<Success>> Handle(EndShiftCommand request, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Attempting to end shift: {ShiftId}", request.ShiftId);
+        logger.LogInformation("Attempting to end shift: {ShiftId}", request.ShiftId);
 
         var shift = await _shiftCollection.Find(s => s.Id == request.ShiftId).FirstOrDefaultAsync(cancellationToken);
-        if (shift == null)
+        if (shift is null)
         {
-            _logger.LogWarning("EndShift failed: Shift with ID {ShiftId} not found", request.ShiftId);
+            logger.LogWarning("EndShift failed: Shift with ID {ShiftId} not found", request.ShiftId);
             return ShiftLogErrors.NotFound(request.ShiftId);
         }
 
@@ -51,7 +43,7 @@ public class EndShiftCommandHandler : IRequestHandler<EndShiftCommand, ErrorOr<S
             }
             else
             {
-                _logger.LogWarning("Bin with ID {BinId} skipped: not found in database", binId);
+                logger.LogWarning("Bin with ID {BinId} skipped: not found in database", binId);
             }
         }
 
@@ -65,7 +57,7 @@ public class EndShiftCommandHandler : IRequestHandler<EndShiftCommand, ErrorOr<S
 
         await _shiftCollection.UpdateOneAsync(filter, update, cancellationToken: cancellationToken);
 
-        _logger.LogInformation("Shift {ShiftId} ended successfully. Bins cleaned: {Count}. Distance: {Distance} km",
+        logger.LogInformation("Shift {ShiftId} ended successfully. Bins cleaned: {Count}. Distance: {Distance} km",
             request.ShiftId, foundBinsCount, request.DistanceKm);
 
         return Result.Success;

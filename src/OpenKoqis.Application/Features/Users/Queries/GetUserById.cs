@@ -8,30 +8,23 @@ namespace OpenKoqis.Application.Features.Users.Queries;
 
 public record GetUserByIdQuery(string Id) : IRequest<ErrorOr<User>>;
 
-public class GetUserByIdQueryHandler : IRequestHandler<GetUserByIdQuery, ErrorOr<User>>
+public class GetUserByIdQueryHandler(IMongoDatabase database, ILogger<GetUserByIdQueryHandler> logger) : IRequestHandler<GetUserByIdQuery, ErrorOr<User>>
 {
-    private readonly IMongoCollection<User> _collection;
-    private readonly ILogger<GetUserByIdQueryHandler> _logger;
-
-    public GetUserByIdQueryHandler(IMongoDatabase database, ILogger<GetUserByIdQueryHandler> logger)
-    {
-        _collection = database.GetCollection<User>("Users");
-        _logger = logger;
-    }
+    private readonly IMongoCollection<User> _collection = database.GetCollection<User>("Users");
 
     public async Task<ErrorOr<User>> Handle(GetUserByIdQuery request, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Searching for user with ID: {UserId}", request.Id);
+        logger.LogInformation("Searching for user with ID: {UserId}", request.Id);
 
         var user = await _collection.Find(u => u.Id == request.Id).FirstOrDefaultAsync(cancellationToken);
 
-        if (user == null)
+        if (user is null)
         {
-            _logger.LogWarning("User with ID: {UserId} not found", request.Id);
+            logger.LogWarning("User with ID: {UserId} not found", request.Id);
             return UserErrors.NotFound(request.Id);
         }
 
-        _logger.LogInformation("User {UserId} found", request.Id);
+        logger.LogInformation("User {UserId} found", request.Id);
         return user;
     }
 }
