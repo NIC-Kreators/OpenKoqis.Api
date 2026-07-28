@@ -1,0 +1,5 @@
+{
+  "appHost": {
+    "path": "OpenKoqis.Api.AppHost/OpenKoqis.Api.AppHost.csproj"
+  }
+}
