@@ -8,6 +8,8 @@ using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.AddServiceDefaults();
+
 builder.WebHost.CaptureStartupErrors(true);
 builder.WebHost.UseSetting("detailedErrors", "true");
 
@@ -34,6 +36,8 @@ builder.Services
 
 
 var app = builder.Build();
+
+app.MapDefaultEndpoints();
 
 app.UseSerilogRequestLogging();
 

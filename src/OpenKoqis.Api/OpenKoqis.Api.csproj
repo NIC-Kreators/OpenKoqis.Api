@@ -27,9 +27,10 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\OpenKoqis.Application\OpenKoqis.Application.csproj" />
-        <ProjectReference Include="..\OpenKoqis.Domain\OpenKoqis.Domain.csproj" />
-        <ProjectReference Include="..\OpenKoqis.Infrastructure\OpenKoqis.Infrastructure.csproj" />
+        <ProjectReference Include="../OpenKoqis.Api.ServiceDefaults/OpenKoqis.Api.ServiceDefaults.csproj" />
+        <ProjectReference Include="../OpenKoqis.Application/OpenKoqis.Application.csproj" />
+        <ProjectReference Include="../OpenKoqis.Domain/OpenKoqis.Domain.csproj" />
+        <ProjectReference Include="../OpenKoqis.Infrastructure/OpenKoqis.Infrastructure.csproj" />
     </ItemGroup>
 
     <Target Name="husky" BeforeTargets="Restore;CollectPackageReferences" Condition="'$(HUSKY)' != 0">
