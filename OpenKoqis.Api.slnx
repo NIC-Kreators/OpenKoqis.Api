@@ -1,9 +1,5 @@
 <Solution>
-  <Folder Name="/Solution Items/">
-    <File Path="compose.yaml" />
-    <File Path="Dockerfile" />
-    <File Path=".dockerignore" />
-  </Folder>
+  <Folder Name="/Solution Items/" />
   <Project Path="src/OpenKoqis.Api.AppHost/OpenKoqis.Api.AppHost.csproj" />
   <Project Path="src/OpenKoqis.Api.ServiceDefaults/OpenKoqis.Api.ServiceDefaults.csproj" />
   <Project Path="src/OpenKoqis.Api/OpenKoqis.Api.csproj" />

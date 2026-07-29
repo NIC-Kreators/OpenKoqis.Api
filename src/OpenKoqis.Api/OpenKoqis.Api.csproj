@@ -5,6 +5,8 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+        <ContainerRepository>open-koqis.api</ContainerRepository>
+        <ContainerImageTags>latest;0.0.1</ContainerImageTags>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
         <NuGetAuditMode>direct</NuGetAuditMode>
