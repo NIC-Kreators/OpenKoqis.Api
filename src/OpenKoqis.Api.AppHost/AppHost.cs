@@ -1,7 +1,7 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
 // Main Database
-var mongoUsername = builder.AddParameter("mongo-username", value: "develop_admin");
+var mongoUsername = builder.AddParameter("mongo-username");
 var mongoPassword = builder.AddParameter("mongo-password", secret: true);
 
 var mongo = builder
