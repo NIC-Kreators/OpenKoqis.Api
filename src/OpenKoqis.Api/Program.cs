@@ -42,23 +42,6 @@ app.MapDefaultEndpoints();
 app.UseSerilogRequestLogging();
 
 app.AddScalar();
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-    app.MapScalarApiReference("/docs", options =>
-    {
-        options
-            .WithTitle("OpenKoqis API")
-            .WithTheme(ScalarTheme.DeepSpace)
-            .ShowOperationId()
-            .WithDefaultHttpClient(ScalarTarget.Node, ScalarClient.Undici)
-            .AddPreferredSecuritySchemes("BearerAuth")
-            .AddHttpAuthentication("BearerAuth", auth =>
-            {
-                auth.Token = "Your jwt token";
-            });
-    });
-}
 app.MapControllers();
 
 // Endpoint for testing, that app is ready (as it now have no working endpoints yet)
