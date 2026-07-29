@@ -60,6 +60,8 @@ if (app.Environment.IsDevelopment())
     });
 }
 app.MapControllers();
+
+// Endpoint for testing, that app is ready (as it now have no working endpoints yet)
 app.MapGet("/hello", () => "Hello").Stable();
-app.MapGet("/health", () => Results.Ok()).Stable();
+
 app.Run();
