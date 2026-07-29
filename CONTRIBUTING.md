@@ -1,5 +1,13 @@
 # Contributing to the OpenKoqis Guideline
 
+## 📂 Project Layout
+
+* `src/OpenKoqis.Api` — the API project (ASP.NET Core)
+* `src/OpenKoqis.Api.AppHost` — the Aspire orchestrator used for local development (see below)
+* `src/OpenKoqis.Api.ServiceDefaults` — shared OpenTelemetry/health-check/resilience wiring, referenced by the API
+* `src/OpenKoqis.Application`, `src/OpenKoqis.Domain`, `src/OpenKoqis.Infrastructure` — the application layers
+* `config/` — configuration shared across environments (e.g. `config/mosquitto/` for the MQTT broker), consumed by both the AppHost and production deployments
+
 ## 🚀 Development Environment (Aspire)
 
 This is the way to run the project day-to-day. The section below on container building is for producing a publishable image, not for local development — you don't need Docker builds or a `Dockerfile` just to work on the code.
@@ -9,13 +17,17 @@ This is the way to run the project day-to-day. The section below on container bu
 * Docker Desktop (or a running Docker daemon)
 
 ### First-time setup
-Set the MongoDB dev password once:
+1. Copy the environment file and fill in the values it needs:
+   ```bash
+   cp .env.example .env
+   ```
+   This is read by the API itself (`OpenKoqis.Api`) at startup for its own settings — separate from the AppHost parameter below.
 
-```bash
-dotnet user-secrets set "Parameters:mongo-password" "your-dev-password" --project src/OpenKoqis.Api.AppHost
-```
-
-The username defaults to `develop_admin` (see `src/OpenKoqis.Api.AppHost/appsettings.Development.json`); override it the same way if needed.
+2. Set the MongoDB dev password used by the AppHost:
+   ```bash
+   dotnet user-secrets set "Parameters:mongo-password" "your-dev-password" --project src/OpenKoqis.Api.AppHost
+   ```
+   The username defaults to `develop_admin` (see `src/OpenKoqis.Api.AppHost/appsettings.Development.json`); override it the same way if needed.
 
 ### Running the app WITH infrastructure
 Open the solution in your IDE (Rider/VS/VS Code) and run the `OpenKoqis.Api.AppHost` project.
@@ -31,6 +43,12 @@ This starts:
 The AppHost prints a link to the **Aspire dashboard**, where you can see logs, traces, metrics, and resource status for everything above — you don't need Seq/Prometheus/Grafana locally, the dashboard covers OpenTelemetry viewing for development.
 
 > Note: the Docker-based build below (`dotnet publish ... /t:PublishContainer`) is for producing a release artifact, not for development — always use Aspire locally.
+
+## ✅ Code Style & Pre-commit Hooks
+
+This repo uses [Husky.Net](https://github.com/alirezanet/husky.net) to run `dotnet format` on staged `.cs` files before each commit. The git hook installs itself automatically the first time you restore or build the solution (`dotnet build`/`dotnet restore`) — no extra setup command needed.
+
+If a commit is rejected, it means `dotnet format` found style violations; re-stage the files it fixed and commit again.
 
 ## 🐳 Container Building (No Dockerfile Required)
 
