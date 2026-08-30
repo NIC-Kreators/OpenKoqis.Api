@@ -3,7 +3,6 @@ using OpenKoqis.Api.Extensions;
 using OpenKoqis.Api.Mqtt;
 using OpenKoqis.Application.Services;
 using OpenKoqis.Infrastructure.Services;
-using Scalar.AspNetCore;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -43,8 +42,5 @@ app.UseSerilogRequestLogging();
 
 app.AddScalar();
 app.MapControllers();
-
-// Endpoint for testing, that app is ready (as it now have no working endpoints yet)
-app.MapGet("/hello", () => "Hello").Stable();
 
 app.Run();
