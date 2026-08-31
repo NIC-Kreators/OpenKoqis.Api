@@ -10,13 +10,15 @@ var mongo = builder
     .WithLifetime(ContainerLifetime.Persistent);
 var mongoDb = mongo.AddDatabase("openkoqis");
 
-// Message Bus with IoT devices (mqtt via eclipse-mosquitto). Maybe it should be a NuGet package or use NATS
+// Message Bus with IoT devices (mqtt via eclipse-mosquitto)
+var mosquittoConfigsRoot = $"{builder.Environment.ContentRootPath}/config/mosquitto";
+
 var messageBus = builder
     .AddContainer("openkoqis-mqtt", "eclipse-mosquitto")
     .WithEndpoint(name: "mqtt", port: 1883, targetPort: 1883)
-    .WithBindMount("../../config/mosquitto/config", "/mosquitto/config")
-    .WithBindMount("../../config/mosquitto/logs", "/mosquitto/logs")
-    .WithBindMount("../../config/mosquitto/data", "/mosquitto/data")
+    .WithBindMount($"{mosquittoConfigsRoot}/config", "/mosquitto/config")
+    .WithBindMount($"{mosquittoConfigsRoot}/logs", "/mosquitto/logs")
+    .WithBindMount($"{mosquittoConfigsRoot}/data", "/mosquitto/data")
     .WithLifetime(ContainerLifetime.Persistent);
 
 builder.AddProject<Projects.OpenKoqis_Api>("openkoqis-api")
