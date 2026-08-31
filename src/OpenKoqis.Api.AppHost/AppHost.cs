@@ -6,6 +6,9 @@ var mongoPassword = builder.AddParameter("mongo-password", secret: true);
 
 var mongo = builder
     .AddMongoDB("openkoqis-mongo", userName: mongoUsername, password: mongoPassword)
+    // Solved error: "MongoDB cannot start: Linux kernel versions 6.19 and newer has a known incompatibility with this version of MongoDB."
+    // Remove when mongodb official image will migrate to the linux 7.1+ base image.
+    .WithEnvironment("GLIBC_TUNABLES", "glibc.pthread.rseq=1")
     .WithDataVolume()
     .WithLifetime(ContainerLifetime.Persistent);
 var mongoDb = mongo.AddDatabase("openkoqis");
