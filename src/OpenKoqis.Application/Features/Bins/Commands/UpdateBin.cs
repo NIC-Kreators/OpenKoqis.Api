@@ -1,5 +1,5 @@
 using ErrorOr;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using OpenKoqis.Domain.Models;
@@ -8,20 +8,13 @@ namespace OpenKoqis.Application.Features.Bins.Commands;
 
 public record UpdateBinCommand(string Id, BinType Type, GeoPoint Location, BinStatus Status) : IRequest<ErrorOr<Success>>;
 
-public class UpdateBinCommandHandler : IRequestHandler<UpdateBinCommand, ErrorOr<Success>>
+public class UpdateBinCommandHandler(IMongoDatabase database, ILogger<UpdateBinCommandHandler> logger) : IRequestHandler<UpdateBinCommand, ErrorOr<Success>>
 {
-    private readonly IMongoCollection<Bin> _collection;
-    private readonly ILogger<UpdateBinCommandHandler> _logger;
+    private readonly IMongoCollection<Bin> _collection = database.GetCollection<Bin>("Bins");
 
-    public UpdateBinCommandHandler(IMongoDatabase database, ILogger<UpdateBinCommandHandler> logger)
+    public async ValueTask<ErrorOr<Success>> Handle(UpdateBinCommand request, CancellationToken cancellationToken)
     {
-        _collection = database.GetCollection<Bin>("Bins");
-        _logger = logger;
-    }
-
-    public async Task<ErrorOr<Success>> Handle(UpdateBinCommand request, CancellationToken cancellationToken)
-    {
-        _logger.LogInformation("Attempting to update bin {BinId}", request.Id);
+        logger.LogInformation("Attempting to update bin {BinId}", request.Id);
 
         var filter = Builders<Bin>.Filter.Eq(b => b.Id, request.Id);
         var update = Builders<Bin>.Update
@@ -32,13 +25,13 @@ public class UpdateBinCommandHandler : IRequestHandler<UpdateBinCommand, ErrorOr
 
         var result = await _collection.UpdateOneAsync(filter, update, cancellationToken: cancellationToken);
 
-        if (result.MatchedCount == 0)
+        if (result.MatchedCount is 0)
         {
-            _logger.LogWarning("Update failed. Bin '{BinId}' not found", request.Id);
+            logger.LogWarning("Update failed. Bin '{BinId}' not found", request.Id);
             return BinErrors.NotFound(request.Id);
         }
 
-        _logger.LogInformation("Bin {BinId} updated successfully", request.Id);
+        logger.LogInformation("Bin {BinId} updated successfully", request.Id);
         return Result.Success;
     }
 }

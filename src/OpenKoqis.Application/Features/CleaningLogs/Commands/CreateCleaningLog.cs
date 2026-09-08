@@ -1,5 +1,5 @@
 using ErrorOr;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using OpenKoqis.Domain.Models;
@@ -8,28 +8,20 @@ namespace OpenKoqis.Application.Features.CleaningLogs.Commands;
 
 public record CreateCleaningLogCommand(CleaningLog Log) : IRequest<ErrorOr<CleaningLog>>;
 
-public class CreateCleaningLogCommandHandler : IRequestHandler<CreateCleaningLogCommand, ErrorOr<CleaningLog>>
+public class CreateCleaningLogCommandHandler(IMongoDatabase database, ILogger<CreateCleaningLogCommandHandler> logger) : IRequestHandler<CreateCleaningLogCommand, ErrorOr<CleaningLog>>
 {
-    private readonly IMongoCollection<CleaningLog> _collection;
-    private readonly ILogger<CreateCleaningLogCommandHandler> _logger;
+    private readonly IMongoCollection<CleaningLog> _collection = database.GetCollection<CleaningLog>("CleaningLogs");
 
-    public CreateCleaningLogCommandHandler(IMongoDatabase database, ILogger<CreateCleaningLogCommandHandler> logger)
+    public async ValueTask<ErrorOr<CleaningLog>> Handle(CreateCleaningLogCommand request, CancellationToken cancellationToken)
     {
-        _collection = database.GetCollection<CleaningLog>("CleaningLogs");
-        _logger = logger;
-    }
+        logger.LogInformation("Creating new manual cleaning log entry");
 
-    public async Task<ErrorOr<CleaningLog>> Handle(CreateCleaningLogCommand request, CancellationToken cancellationToken)
-    {
-        _logger.LogInformation("Creating new manual cleaning log entry");
+        request.Log.CreatedAt = DateTime.UtcNow;
+        request.Log.UpdatedAt = request.Log.CreatedAt;
 
-        var log = request.Log;
-        log.CreatedAt = DateTime.UtcNow;
-        log.UpdatedAt = log.CreatedAt;
+        await _collection.InsertOneAsync(request.Log, cancellationToken: cancellationToken);
+        logger.LogInformation("Cleaning log inserted with generated ID: {Id}", request.Log.Id);
 
-        await _collection.InsertOneAsync(log, cancellationToken: cancellationToken);
-        _logger.LogInformation("Cleaning log inserted with generated ID: {Id}", log.Id);
-
-        return log;
+        return request.Log;
     }
 }

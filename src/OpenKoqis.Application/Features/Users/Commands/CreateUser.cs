@@ -1,5 +1,5 @@
 using ErrorOr;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using OpenKoqis.Domain.Models;
@@ -19,7 +19,7 @@ public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, Error
         _logger = logger;
     }
 
-    public async Task<ErrorOr<User>> Handle(CreateUserCommand request, CancellationToken cancellationToken)
+    public async ValueTask<ErrorOr<User>> Handle(CreateUserCommand request, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Creating new user with Nickname: {Nickname}", request.User.Nickname);
 

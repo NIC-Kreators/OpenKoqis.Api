@@ -1,5 +1,5 @@
 using ErrorOr;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Mvc;
 using OpenKoqis.Application.Features.ShiftLogs.Commands;
 using OpenKoqis.Application.Features.ShiftLogs.Queries;
@@ -9,133 +9,40 @@ namespace OpenKoqis.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class ShiftLogsController(ISender mediator, ILogger<ShiftLogsController> logger) : ControllerBase
+public class ShiftLogsController(ISender mediator) : ApiController
 {
     [HttpGet]
-    public async Task<IActionResult> GetAsync()
-    {
-        logger.LogInformation("Request received: Get all shift logs");
-
-        var result = await mediator.Send(new GetAllShiftLogsQuery());
-
-        return result.Match(
-            shifts =>
-            {
-                logger.LogInformation("Successfully retrieved {Count} shifts", shifts.Count);
-                return Ok(shifts);
-            },
-            errors => Problem(errors)
-        );
-    }
+    public async Task<IActionResult> GetAsync() =>
+        (await mediator.Send(new GetAllShiftLogsQuery())).Match(Ok, Problem);
 
     [HttpGet("{id}")]
-    public async Task<IActionResult> GetByIdAsync(string id)
-    {
-        logger.LogInformation("Request received: Get shift log with ID: {Id}", id);
+    public async Task<IActionResult> GetByIdAsync(string id) =>
+        (await mediator.Send(new GetShiftLogByIdQuery(id))).Match(Ok, Problem);
 
-        var result = await mediator.Send(new GetShiftLogByIdQuery(id));
-
-        return result.Match(
-            shift =>
-            {
-                logger.LogInformation("Successfully retrieved shift log for User: {UserId}", shift.UserId);
-                return Ok(shift);
-            },
-            errors => Problem(errors)
-        );
-    }
-
-    public class StartShiftRequest
-    {
-        public string UserId { get; set; } = null!;
-    }
+    public record StartShiftRequest(string UserId);
 
     [HttpPost("start")]
-    public async Task<IActionResult> StartAsync([FromBody] StartShiftRequest req)
-    {
-        logger.LogInformation("Attempting to start a new shift for User: {UserId}", req.UserId);
+    public async Task<IActionResult> StartAsync([FromBody] StartShiftRequest req) =>
+        (await mediator.Send(new StartShiftCommand(req.UserId))).Match(
+            created => CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id }, created),
+            Problem);
 
-        var result = await mediator.Send(new StartShiftCommand(req.UserId));
-
-        return result.Match(
-            created =>
-            {
-                logger.LogInformation("Shift started successfully. Assigned ID: {ShiftId}", created.Id);
-                return CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id }, created);
-            },
-            errors => Problem(errors)
-        );
-    }
-
-    public class EndShiftRequest
-    {
-        public DateTime? EndedAt { get; set; }
-        public IEnumerable<string>? CleanedBinIds { get; set; }
-        public double DistanceKm { get; set; }
-        public string? Route { get; set; }
-    }
+    public record EndShiftRequest(DateTime? EndedAt, IEnumerable<string>? CleanedBinIds, double DistanceKm, string? Route = null);
 
     [HttpPost("{id}/end")]
-    public async Task<IActionResult> EndAsync(string id, [FromBody] EndShiftRequest req)
-    {
-        logger.LogInformation("Attempting to end shift ID: {Id}. Distance: {Distance}km", id, req.DistanceKm);
-
-        var command = new EndShiftCommand(
+    public async Task<IActionResult> EndAsync(string id, [FromBody] EndShiftRequest req) =>
+        (await mediator.Send(new EndShiftCommand(
             id,
             req.EndedAt ?? default,
-            req.CleanedBinIds ?? Enumerable.Empty<string>(),
+            req.CleanedBinIds ?? [],
             req.DistanceKm,
-            req.Route);
-
-        var result = await mediator.Send(command);
-
-        return result.Match(
-            _ =>
-            {
-                logger.LogInformation("Shift ID: {Id} ended successfully", id);
-                return NoContent();
-            },
-            errors => Problem(errors)
-        );
-    }
+            req.Route))).Match(
+            _ => NoContent(),
+            Problem);
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteAsync(string id)
-    {
-        logger.LogInformation("Request to delete shift log ID: {Id}", id);
-
-        var result = await mediator.Send(new DeleteShiftLogCommand(id));
-
-        return result.Match(
-            _ =>
-            {
-                logger.LogInformation("Shift log ID: {Id} deleted successfully", id);
-                return NoContent();
-            },
-            errors => Problem(errors)
-        );
-    }
-
-
-    private IActionResult Problem(List<Error> errors)
-    {
-        if (errors.Count == 0)
-        {
-            return Problem();
-        }
-
-        var firstError = errors.First();
-
-        var statusCode = firstError.Type switch
-        {
-            ErrorType.NotFound => StatusCodes.Status404NotFound,
-            ErrorType.Validation => StatusCodes.Status400BadRequest,
-            ErrorType.Conflict => StatusCodes.Status409Conflict,
-            ErrorType.Unauthorized => StatusCodes.Status401Unauthorized,
-            ErrorType.Forbidden => StatusCodes.Status403Forbidden,
-            _ => StatusCodes.Status500InternalServerError
-        };
-
-        return Problem(statusCode: statusCode, title: firstError.Description);
-    }
+    public async Task<IActionResult> DeleteAsync(string id) =>
+        (await mediator.Send(new DeleteShiftLogCommand(id))).Match(
+            _ => NoContent(),
+            Problem);
 }

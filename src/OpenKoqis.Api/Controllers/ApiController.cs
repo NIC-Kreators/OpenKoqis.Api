@@ -1,4 +1,3 @@
-// Controllers/ApiController.cs
 using ErrorOr;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,16 +7,8 @@ namespace OpenKoqis.Api.Controllers;
 [Route("api/[controller]")]
 public abstract class ApiController : ControllerBase
 {
-    protected IActionResult Problem(List<Error> errors)
-    {
-        if (errors.Count == 0)
-        {
-            return Problem();
-        }
-
-        var firstError = errors[0];
-
-        var statusCode = firstError.Type switch
+    protected IActionResult Problem(List<Error> errors) => errors is [] ? Problem() : Problem(
+        statusCode: errors[0].Type switch
         {
             ErrorType.Conflict => StatusCodes.Status409Conflict,
             ErrorType.Validation => StatusCodes.Status400BadRequest,
@@ -25,8 +16,6 @@ public abstract class ApiController : ControllerBase
             ErrorType.Unauthorized => StatusCodes.Status401Unauthorized,
             ErrorType.Forbidden => StatusCodes.Status403Forbidden,
             _ => StatusCodes.Status500InternalServerError
-        };
-
-        return Problem(statusCode: statusCode, detail: firstError.Description);
-    }
+        },
+        detail: errors[0].Description);
 }

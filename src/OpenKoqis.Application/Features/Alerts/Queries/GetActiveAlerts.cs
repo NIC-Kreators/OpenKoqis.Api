@@ -1,5 +1,5 @@
 using ErrorOr;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using OpenKoqis.Domain.Models;
@@ -8,25 +8,17 @@ namespace OpenKoqis.Application.Features.Alerts.Queries;
 
 public record GetActiveAlertsQuery : IRequest<ErrorOr<List<Alert>>>;
 
-public class GetActiveAlertsQueryHandler : IRequestHandler<GetActiveAlertsQuery, ErrorOr<List<Alert>>>
+public class GetActiveAlertsQueryHandler(IMongoDatabase database, ILogger<GetActiveAlertsQueryHandler> logger) : IRequestHandler<GetActiveAlertsQuery, ErrorOr<List<Alert>>>
 {
-    private readonly IMongoCollection<Alert> _collection;
-    private readonly ILogger<GetActiveAlertsQueryHandler> _logger;
+    private readonly IMongoCollection<Alert> _collection = database.GetCollection<Alert>("Alerts");
 
-    public GetActiveAlertsQueryHandler(IMongoDatabase database, ILogger<GetActiveAlertsQueryHandler> logger)
+    public async ValueTask<ErrorOr<List<Alert>>> Handle(GetActiveAlertsQuery request, CancellationToken cancellationToken)
     {
-        _collection = database.GetCollection<Alert>("Alerts");
-        _logger = logger;
-    }
+        logger.LogInformation("Filtering active (unresolved) alerts");
 
-    public async Task<ErrorOr<List<Alert>>> Handle(GetActiveAlertsQuery request, CancellationToken cancellationToken)
-    {
-        _logger.LogInformation("Filtering active (unresolved) alerts");
+        var activeAlerts = await _collection.Find(a => !a.IsResolved).ToListAsync(cancellationToken);
 
-        var filter = Builders<Alert>.Filter.Eq(a => a.IsResolved, false);
-        var activeAlerts = await _collection.Find(filter).ToListAsync(cancellationToken);
-
-        _logger.LogInformation("Found {Count} active alerts", activeAlerts.Count);
+        logger.LogInformation("Found {Count} active alerts", activeAlerts.Count);
         return activeAlerts;
     }
 }

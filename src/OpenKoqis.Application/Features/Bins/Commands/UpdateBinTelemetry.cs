@@ -1,5 +1,5 @@
 using ErrorOr;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using OpenKoqis.Domain.Models;
@@ -8,23 +8,16 @@ namespace OpenKoqis.Application.Features.Bins.Commands;
 
 public record UpdateBinTelemetryCommand(string BinId, BinTelemetry Telemetry) : IRequest<ErrorOr<Success>>;
 
-public class UpdateBinTelemetryCommandHandler : IRequestHandler<UpdateBinTelemetryCommand, ErrorOr<Success>>
+public class UpdateBinTelemetryCommandHandler(IMongoDatabase database, ILogger<UpdateBinTelemetryCommandHandler> logger) : IRequestHandler<UpdateBinTelemetryCommand, ErrorOr<Success>>
 {
-    private readonly IMongoCollection<Bin> _collection;
-    private readonly ILogger<UpdateBinTelemetryCommandHandler> _logger;
+    private readonly IMongoCollection<Bin> _collection = database.GetCollection<Bin>("Bins");
 
-    public UpdateBinTelemetryCommandHandler(IMongoDatabase database, ILogger<UpdateBinTelemetryCommandHandler> logger)
+    public async ValueTask<ErrorOr<Success>> Handle(UpdateBinTelemetryCommand request, CancellationToken cancellationToken)
     {
-        _collection = database.GetCollection<Bin>("Bins");
-        _logger = logger;
-    }
-
-    public async Task<ErrorOr<Success>> Handle(UpdateBinTelemetryCommand request, CancellationToken cancellationToken)
-    {
-        _logger.LogInformation("Updating current telemetry for bin {BinId}", request.BinId);
+        logger.LogInformation("Updating current telemetry for bin {BinId}", request.BinId);
 
         var telemetry = request.Telemetry;
-        telemetry.LastUpdated = telemetry.LastUpdated == default ? DateTime.UtcNow : telemetry.LastUpdated;
+        telemetry.LastUpdated ??= DateTime.UtcNow;
 
         var filter = Builders<Bin>.Filter.Eq(b => b.Id, request.BinId);
         var update = Builders<Bin>.Update
@@ -33,13 +26,13 @@ public class UpdateBinTelemetryCommandHandler : IRequestHandler<UpdateBinTelemet
 
         var result = await _collection.UpdateOneAsync(filter, update, cancellationToken: cancellationToken);
 
-        if (result.MatchedCount == 0)
+        if (result.MatchedCount is 0)
         {
-            _logger.LogWarning("Telemetry update failed. Bin '{BinId}' not found", request.BinId);
+            logger.LogWarning("Telemetry update failed. Bin '{BinId}' not found", request.BinId);
             return BinErrors.NotFound(request.BinId);
         }
 
-        _logger.LogInformation("Current telemetry for bin {BinId} updated. Fill level: {FillLevel}%", request.BinId, telemetry.FillLevel);
+        logger.LogInformation("Current telemetry for bin {BinId} updated. Fill level: {FillLevel}%", request.BinId, telemetry.FillLevel);
         return Result.Success;
     }
 }

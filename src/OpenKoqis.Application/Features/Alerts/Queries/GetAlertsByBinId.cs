@@ -1,5 +1,5 @@
 using ErrorOr;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using OpenKoqis.Domain.Models;
@@ -8,25 +8,17 @@ namespace OpenKoqis.Application.Features.Alerts.Queries;
 
 public record GetAlertsByBinIdQuery(string BinId) : IRequest<ErrorOr<List<Alert>>>;
 
-public class GetAlertsByBinIdQueryHandler : IRequestHandler<GetAlertsByBinIdQuery, ErrorOr<List<Alert>>>
+public class GetAlertsByBinIdQueryHandler(IMongoDatabase database, ILogger<GetAlertsByBinIdQueryHandler> logger) : IRequestHandler<GetAlertsByBinIdQuery, ErrorOr<List<Alert>>>
 {
-    private readonly IMongoCollection<Alert> _collection;
-    private readonly ILogger<GetAlertsByBinIdQueryHandler> _logger;
+    private readonly IMongoCollection<Alert> _collection = database.GetCollection<Alert>("Alerts");
 
-    public GetAlertsByBinIdQueryHandler(IMongoDatabase database, ILogger<GetAlertsByBinIdQueryHandler> logger)
+    public async ValueTask<ErrorOr<List<Alert>>> Handle(GetAlertsByBinIdQuery request, CancellationToken cancellationToken)
     {
-        _collection = database.GetCollection<Alert>("Alerts");
-        _logger = logger;
-    }
+        logger.LogInformation("Searching alerts for BinId: {BinId}", request.BinId);
 
-    public async Task<ErrorOr<List<Alert>>> Handle(GetAlertsByBinIdQuery request, CancellationToken cancellationToken)
-    {
-        _logger.LogInformation("Searching alerts for BinId: {BinId}", request.BinId);
+        var alerts = await _collection.Find(a => a.BinId == request.BinId).ToListAsync(cancellationToken);
 
-        var filter = Builders<Alert>.Filter.Eq(a => a.BinId, request.BinId);
-        var alerts = await _collection.Find(filter).ToListAsync(cancellationToken);
-
-        _logger.LogInformation("Retrieved {Count} alerts for BinId: {BinId}", alerts.Count, request.BinId);
+        logger.LogInformation("Retrieved {Count} alerts for BinId: {BinId}", alerts.Count, request.BinId);
         return alerts;
     }
 }
