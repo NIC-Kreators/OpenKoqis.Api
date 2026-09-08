@@ -1,4 +1,4 @@
-﻿namespace OpenKoqis.Domain.Models;
+namespace OpenKoqis.Domain.Models;
 
 public class BinTelemetry
 {
