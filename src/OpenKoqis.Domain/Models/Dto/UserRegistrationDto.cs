@@ -1,4 +1,4 @@
-﻿namespace OpenKoqis.Domain.Models.Dto;
+namespace OpenKoqis.Domain.Models.Dto;
 
 public record UserRegistrationDto
 {

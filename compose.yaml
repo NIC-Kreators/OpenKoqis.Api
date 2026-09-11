@@ -1,4 +1,4 @@
-﻿name: 'open-koqis'
+name: 'open-koqis'
 
 services:
   open-koqis.api:

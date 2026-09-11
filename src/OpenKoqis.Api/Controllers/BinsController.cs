@@ -19,8 +19,10 @@ public class BinsController(ISender mediator) : ApiController
         return result.Match(
             bins =>
             {
-                if (status is { } s) bins = bins.Where(b => b.Status == s).ToList();
-                if (minFillLevel is { } m) bins = bins.Where(b => b.Telemetry.FillLevel >= m).ToList();
+                if (status is { } s)
+                    bins = bins.Where(b => b.Status == s).ToList();
+                if (minFillLevel is { } m)
+                    bins = bins.Where(b => b.Telemetry.FillLevel >= m).ToList();
                 return Ok(bins);
             },
             Problem
@@ -40,10 +42,12 @@ public class BinsController(ISender mediator) : ApiController
     public async Task<IActionResult> PostTelemetryAsync(string id, [FromBody] BinTelemetry telemetry)
     {
         var updateResult = await mediator.Send(new UpdateBinTelemetryCommand(id, telemetry));
-        if (updateResult.IsError) return Problem(updateResult.Errors);
+        if (updateResult.IsError)
+            return Problem(updateResult.Errors);
 
         var historyResult = await mediator.Send(new UpdateBinTelemetryHistoryCommand(id, telemetry));
-        if (historyResult.IsError) return Problem(historyResult.Errors);
+        if (historyResult.IsError)
+            return Problem(historyResult.Errors);
 
         if (telemetry.IsSmokeDetected)
         {
@@ -81,7 +85,8 @@ public class BinsController(ISender mediator) : ApiController
         foreach (var bin in binFaker.Generate(count))
         {
             var result = await mediator.Send(new CreateBinCommand(bin.Type, bin.Location, bin.Telemetry, bin.Status));
-            if (!result.IsError) successCount++;
+            if (!result.IsError)
+                successCount++;
         }
 
         return Ok(new { message = $"Successfully seeded {successCount} out of {count} bins in Almaty region" });

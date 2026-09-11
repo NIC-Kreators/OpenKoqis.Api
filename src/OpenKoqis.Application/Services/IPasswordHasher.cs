@@ -1,4 +1,4 @@
-﻿namespace OpenKoqis.Application.Services;
+namespace OpenKoqis.Application.Services;
 
 public interface IPasswordHasher
 {

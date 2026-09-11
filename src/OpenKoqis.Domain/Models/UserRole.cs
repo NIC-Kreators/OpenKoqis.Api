@@ -1,4 +1,4 @@
-﻿namespace OpenKoqis.Domain.Models;
+namespace OpenKoqis.Domain.Models;
 
 // Base record for all roles. Must be abstract.
 public abstract record UserRole
