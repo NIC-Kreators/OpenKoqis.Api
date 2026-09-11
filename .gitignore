@@ -12,3 +12,7 @@ mosquitto.db
 # Local configuration files and instructions
 *.local.json
 *.local.md
+
+# OS Specific "rubbish" files
+desktop.ini
+.DS_Store
