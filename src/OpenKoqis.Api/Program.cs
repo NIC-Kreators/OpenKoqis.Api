@@ -23,7 +23,7 @@ builder.Services.AddAuthorizationSecPolicies();
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
-builder.Services.AddMediator();
+builder.Services.AddMediator(cfg => cfg.ServiceLifetime = ServiceLifetime.Scoped);
 builder.Services
     .AddScoped<MqttClientService>()
     .AddScoped<IJwtService, JwtService>()

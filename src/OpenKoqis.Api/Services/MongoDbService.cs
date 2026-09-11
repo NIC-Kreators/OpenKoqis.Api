@@ -1,5 +1,5 @@
-using MongoDB.Driver;
 using Microsoft.Extensions.Options;
+using MongoDB.Driver;
 using OpenKoqis.Api.Options;
 using OpenKoqis.Domain.Models;
 

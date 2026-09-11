@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using OpenKoqis.Application.Services;
 using OpenKoqis.Domain.Models;
-using OpenKoqis.Domain.Models.Dto;
 
 namespace OpenKoqis.Application.Features.Users.Commands;
 
