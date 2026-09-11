@@ -12,30 +12,30 @@ namespace OpenKoqis.Api.Controllers;
 public class CleaningLogsController(ISender mediator) : ApiController
 {
     [HttpGet]
-    public async Task<IActionResult> GetAsync() =>
-        (await mediator.Send(new GetAllCleaningLogsQuery())).Match(Ok, Problem);
+    public async Task<IActionResult> GetAsync(CancellationToken cancellationToken) =>
+        (await mediator.Send(new GetAllCleaningLogsQuery(), cancellationToken)).Match(Ok, Problem);
 
     [HttpGet("{id}")]
-    public async Task<IActionResult> GetByIdAsync(string id) =>
-        (await mediator.Send(new GetCleaningLogByIdQuery(id))).Match(Ok, Problem);
+    public async Task<IActionResult> GetByIdAsync(string id, CancellationToken cancellationToken) =>
+        (await mediator.Send(new GetCleaningLogByIdQuery(id), cancellationToken)).Match(Ok, Problem);
 
     [HttpPost]
-    public async Task<IActionResult> PostAsync([FromBody] CleaningLog log) =>
-        (await mediator.Send(new CreateCleaningLogCommand(log))).Match(
+    public async Task<IActionResult> PostAsync([FromBody] CleaningLog log, CancellationToken cancellationToken) =>
+        (await mediator.Send(new CreateCleaningLogCommand(log), cancellationToken)).Match(
             created => CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id }, created),
             Problem);
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteAsync(string id) =>
-        (await mediator.Send(new DeleteCleaningLogCommand(id))).Match(
+    public async Task<IActionResult> DeleteAsync(string id, CancellationToken cancellationToken) =>
+        (await mediator.Send(new DeleteCleaningLogCommand(id), cancellationToken)).Match(
             _ => NoContent(),
             Problem);
 
     public record LogCleaningRequest(string BinId, string UserId, int RemovedKg, string? Notes = null);
 
     [HttpPost("log")]
-    public async Task<IActionResult> LogCleaningAsync([FromBody] LogCleaningRequest req) =>
-        (await mediator.Send(new LogBinCleaningCommand(req.BinId, req.UserId, req.RemovedKg, req.Notes))).Match(
+    public async Task<IActionResult> LogCleaningAsync([FromBody] LogCleaningRequest req, CancellationToken cancellationToken) =>
+        (await mediator.Send(new LogBinCleaningCommand(req.BinId, req.UserId, req.RemovedKg, req.Notes), cancellationToken)).Match(
             created => CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id }, created),
             Problem);
 }

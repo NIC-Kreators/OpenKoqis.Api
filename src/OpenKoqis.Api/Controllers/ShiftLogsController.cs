@@ -12,37 +12,37 @@ namespace OpenKoqis.Api.Controllers;
 public class ShiftLogsController(ISender mediator) : ApiController
 {
     [HttpGet]
-    public async Task<IActionResult> GetAsync() =>
-        (await mediator.Send(new GetAllShiftLogsQuery())).Match(Ok, Problem);
+    public async Task<IActionResult> GetAsync(CancellationToken cancellationToken) =>
+        (await mediator.Send(new GetAllShiftLogsQuery(), cancellationToken)).Match(Ok, Problem);
 
     [HttpGet("{id}")]
-    public async Task<IActionResult> GetByIdAsync(string id) =>
-        (await mediator.Send(new GetShiftLogByIdQuery(id))).Match(Ok, Problem);
+    public async Task<IActionResult> GetByIdAsync(string id, CancellationToken cancellationToken) =>
+        (await mediator.Send(new GetShiftLogByIdQuery(id), cancellationToken)).Match(Ok, Problem);
 
     public record StartShiftRequest(string UserId);
 
     [HttpPost("start")]
-    public async Task<IActionResult> StartAsync([FromBody] StartShiftRequest req) =>
-        (await mediator.Send(new StartShiftCommand(req.UserId))).Match(
+    public async Task<IActionResult> StartAsync([FromBody] StartShiftRequest req, CancellationToken cancellationToken) =>
+        (await mediator.Send(new StartShiftCommand(req.UserId), cancellationToken)).Match(
             created => CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id }, created),
             Problem);
 
     public record EndShiftRequest(DateTime? EndedAt, IEnumerable<string>? CleanedBinIds, double DistanceKm, string? Route = null);
 
     [HttpPost("{id}/end")]
-    public async Task<IActionResult> EndAsync(string id, [FromBody] EndShiftRequest req) =>
+    public async Task<IActionResult> EndAsync(string id, [FromBody] EndShiftRequest req, CancellationToken cancellationToken) =>
         (await mediator.Send(new EndShiftCommand(
             id,
             req.EndedAt ?? default,
             req.CleanedBinIds ?? [],
             req.DistanceKm,
-            req.Route))).Match(
+            req.Route), cancellationToken)).Match(
             _ => NoContent(),
             Problem);
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteAsync(string id) =>
-        (await mediator.Send(new DeleteShiftLogCommand(id))).Match(
+    public async Task<IActionResult> DeleteAsync(string id, CancellationToken cancellationToken) =>
+        (await mediator.Send(new DeleteShiftLogCommand(id), cancellationToken)).Match(
             _ => NoContent(),
             Problem);
 }

@@ -1,1 +1,1 @@
-/Users/destry.unimaster/Develop/backend/SmartBin/AGENTS.md
+AGENTS.md

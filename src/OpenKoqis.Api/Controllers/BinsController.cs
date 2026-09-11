@@ -12,9 +12,10 @@ namespace OpenKoqis.Api.Controllers;
 public class BinsController(ISender mediator) : ApiController
 {
     [HttpGet]
-    public async Task<IActionResult> GetAsync([FromQuery] BinStatus? status = null, [FromQuery] int? minFillLevel = null)
+    public async Task<IActionResult> GetAsync([FromQuery] BinStatus? status = null, [FromQuery] int? minFillLevel = null,
+        CancellationToken cancellationToken = default)
     {
-        var result = await mediator.Send(new GetAllBinsQuery());
+        var result = await mediator.Send(new GetAllBinsQuery(), cancellationToken);
 
         return result.Match(
             bins =>
@@ -30,41 +31,42 @@ public class BinsController(ISender mediator) : ApiController
     }
 
     [HttpGet("{id}")]
-    public async Task<IActionResult> GetByIdAsync(string id) =>
-        (await mediator.Send(new GetBinByIdQuery(id))).Match(Ok, Problem);
+    public async Task<IActionResult> GetByIdAsync(string id, CancellationToken cancellationToken) =>
+        (await mediator.Send(new GetBinByIdQuery(id), cancellationToken)).Match(Ok, Problem);
 
     [HttpPost]
-    public async Task<IActionResult> PostAsync([FromBody] Bin bin) =>
-        (await mediator.Send(new CreateBinCommand(bin.Type, bin.Location, bin.Telemetry, bin.Status)))
+    public async Task<IActionResult> PostAsync([FromBody] Bin bin, CancellationToken cancellationToken) =>
+        (await mediator.Send(new CreateBinCommand(bin.Type, bin.Location, bin.Telemetry, bin.Status), cancellationToken))
             .Match(created => CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id.ToString() }, created), Problem);
 
     [HttpPost("{id}/telemetry")]
-    public async Task<IActionResult> PostTelemetryAsync(string id, [FromBody] BinTelemetry telemetry)
+    public async Task<IActionResult> PostTelemetryAsync(string id, [FromBody] BinTelemetry telemetry,
+        CancellationToken cancellationToken)
     {
-        var updateResult = await mediator.Send(new UpdateBinTelemetryCommand(id, telemetry));
+        var updateResult = await mediator.Send(new UpdateBinTelemetryCommand(id, telemetry), cancellationToken);
         if (updateResult.IsError)
             return Problem(updateResult.Errors);
 
-        var historyResult = await mediator.Send(new UpdateBinTelemetryHistoryCommand(id, telemetry));
+        var historyResult = await mediator.Send(new UpdateBinTelemetryHistoryCommand(id, telemetry), cancellationToken);
         if (historyResult.IsError)
             return Problem(historyResult.Errors);
 
         if (telemetry.IsSmokeDetected)
         {
-            await mediator.Send(new CreateAlertCommand(id, AlertType.Smoke, AlertSeverity.Critical, "Danger! Smoke detected in the bin.", null));
+            await mediator.Send(new CreateAlertCommand(id, AlertType.Smoke, AlertSeverity.Critical, "Danger! Smoke detected in the bin.", null), cancellationToken);
         }
 
         if (telemetry.FillLevel >= 90)
         {
             var severity = telemetry.FillLevel >= 100 ? AlertSeverity.Critical : AlertSeverity.Warning;
-            await mediator.Send(new CreateAlertCommand(id, AlertType.Fullness, severity, $"Container fill level at {telemetry.FillLevel}%", telemetry.FillLevel.ToString()));
+            await mediator.Send(new CreateAlertCommand(id, AlertType.Fullness, severity, $"Container fill level at {telemetry.FillLevel}%", telemetry.FillLevel.ToString()), cancellationToken);
         }
 
         return NoContent();
     }
 
     [HttpPost("seed/{count}")]
-    public async Task<IActionResult> SeedBinsAsync(int count = 10)
+    public async Task<IActionResult> SeedBinsAsync(int count = 10, CancellationToken cancellationToken = default)
     {
         var telemetryFaker = new Faker<BinTelemetry>()
             .RuleFor(t => t.FillLevel, f => f.Random.Int(0, 100))
@@ -84,7 +86,7 @@ public class BinsController(ISender mediator) : ApiController
         int successCount = 0;
         foreach (var bin in binFaker.Generate(count))
         {
-            var result = await mediator.Send(new CreateBinCommand(bin.Type, bin.Location, bin.Telemetry, bin.Status));
+            var result = await mediator.Send(new CreateBinCommand(bin.Type, bin.Location, bin.Telemetry, bin.Status), cancellationToken);
             if (!result.IsError)
                 successCount++;
         }

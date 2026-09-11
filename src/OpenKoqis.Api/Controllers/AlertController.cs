@@ -8,30 +8,30 @@ namespace OpenKoqis.Api.Controllers;
 public class AlertsController(ISender sender) : ApiController
 {
     [HttpGet]
-    public async Task<IActionResult> GetAllAsync() =>
-        (await sender.Send(new GetAllAlertsQuery())).Match(Ok, Problem);
+    public async Task<IActionResult> GetAllAsync(CancellationToken cancellationToken) =>
+        (await sender.Send(new GetAllAlertsQuery(), cancellationToken)).Match(Ok, Problem);
 
     [HttpGet("active")]
-    public async Task<IActionResult> GetActiveAsync() =>
-        (await sender.Send(new GetActiveAlertsQuery())).Match(Ok, Problem);
+    public async Task<IActionResult> GetActiveAsync(CancellationToken cancellationToken) =>
+        (await sender.Send(new GetActiveAlertsQuery(), cancellationToken)).Match(Ok, Problem);
 
     [HttpGet("bin/{binId}")]
-    public async Task<IActionResult> GetByBinAsync(string binId) =>
-        (await sender.Send(new GetAlertsByBinIdQuery(binId))).Match(
+    public async Task<IActionResult> GetByBinAsync(string binId, CancellationToken cancellationToken) =>
+        (await sender.Send(new GetAlertsByBinIdQuery(binId), cancellationToken)).Match(
             alerts => alerts.Count is 0
                 ? NotFound(($"No alerts found for bin with ID {binId}"))
                 : Ok(alerts),
             Problem);
 
     [HttpPatch("{id}/resolve")]
-    public async Task<IActionResult> ResolveAsync(string id) =>
-        (await sender.Send(new ResolveAlertCommand(id))).Match(
+    public async Task<IActionResult> ResolveAsync(string id, CancellationToken cancellationToken) =>
+        (await sender.Send(new ResolveAlertCommand(id), cancellationToken)).Match(
             _ => NoContent(),
             Problem);
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteAsync(string id) =>
-        (await sender.Send(new DeleteAlertCommand(id))).Match(
+    public async Task<IActionResult> DeleteAsync(string id, CancellationToken cancellationToken) =>
+        (await sender.Send(new DeleteAlertCommand(id), cancellationToken)).Match(
             _ => NoContent(),
             Problem);
 }
