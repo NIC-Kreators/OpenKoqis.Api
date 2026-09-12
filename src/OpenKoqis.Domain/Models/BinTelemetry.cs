@@ -1,9 +1,9 @@
 namespace OpenKoqis.Domain.Models;
 
-public class BinTelemetry
+public class BinTelemetry(FillLevel fillLevel, bool isSmokeDetected, bool isOverloaded, DateTime? lastUpdated = null)
 {
-    public int FillLevel { get; set; } // %
-    public bool IsSmokeDetected { get; set; }
-    public bool IsOverloaded { get; set; } // when overflowed
-    public DateTime? LastUpdated { get; set; }
+    public FillLevel FillLevel { get; } = fillLevel;
+    public bool IsSmokeDetected { get; } = isSmokeDetected;
+    public bool IsOverloaded { get; } = isOverloaded;
+    public DateTime? LastUpdated { get; set; } = lastUpdated;
 }

@@ -1,8 +1,8 @@
 namespace OpenKoqis.Domain.Models;
 
-public class User(string id, string nickname, string fullName, string passwordHash, UserRole role) : Shared.Entity<string>(id)
+public class User(string id, Username nickname, string fullName, string passwordHash, UserRole role) : Shared.Entity<string>(id)
 {
-    public string Nickname { get; } = nickname;
+    public Username Nickname { get; } = nickname;
     public string FullName { get; private set; } = fullName;
     public string PasswordHash { get; private set; } = passwordHash;
     public UserRole Role { get; private set; } = role;

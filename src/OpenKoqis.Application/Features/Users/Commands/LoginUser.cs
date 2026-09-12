@@ -18,7 +18,7 @@ public class LoginUserCommandHandler(IMongoDatabase database, IJwtService jwtSer
     {
         logger.LogInformation("Login attempt for Nickname: {Nickname}", request.Nickname);
 
-        var user = await _collection.Find(u => u.Nickname == request.Nickname).FirstOrDefaultAsync(cancellationToken);
+        var user = await _collection.Find(u => u.Nickname.Value == request.Nickname).FirstOrDefaultAsync(cancellationToken);
         if (user is null)
         {
             logger.LogWarning("Login failed. User {Nickname} not found", request.Nickname);
@@ -32,6 +32,6 @@ public class LoginUserCommandHandler(IMongoDatabase database, IJwtService jwtSer
         }
 
         logger.LogInformation("User {Nickname} logged in successfully", request.Nickname);
-        return await jwtService.GenerateTokenPairAsync(user.Id, user.Nickname, user.Role);
+        return await jwtService.GenerateTokenPairAsync(user.Id, user.Nickname.Value, user.Role);
     }
 }
