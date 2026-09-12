@@ -6,14 +6,16 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <UserSecretsId>24347b98-9f34-444b-b909-6c5418713470</UserSecretsId>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="../OpenKoqis.Api/OpenKoqis.Api.csproj" />
+        <ProjectReference Include="../OpenKoqis.Api/OpenKoqis.Api.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Aspire.Hosting.MongoDB" Version="13.5.3" />
+        <PackageReference Include="Aspire.Hosting.MongoDB" Version="13.5.3" />
     </ItemGroup>
 
 </Project>
