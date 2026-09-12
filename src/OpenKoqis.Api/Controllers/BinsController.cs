@@ -11,7 +11,9 @@ namespace OpenKoqis.Api.Controllers;
 public class BinsController(ISender mediator) : ApiController
 {
     [HttpGet]
-    public async Task<IActionResult> GetAsync([FromQuery] BinStatus? status = null, [FromQuery] int? minFillLevel = null,
+    public async Task<IActionResult> GetAsync(
+        [FromQuery] BinStatus? status = null,
+        [FromQuery] int? minFillLevel = null,
         CancellationToken cancellationToken = default)
     {
         var result = await mediator.Send(new GetAllBinsQuery(), cancellationToken);
@@ -22,7 +24,7 @@ public class BinsController(ISender mediator) : ApiController
                 if (status is { } s)
                     bins = bins.Where(b => b.Status == s).ToList();
                 if (minFillLevel is { } m)
-                    bins = bins.Where(b => b.Telemetry.FillLevel >= m).ToList();
+                    bins = bins.Where(b => b.Telemetry?.FillLevel >= m).ToList();
                 return Ok(bins);
             },
             Problem
@@ -35,12 +37,13 @@ public class BinsController(ISender mediator) : ApiController
 
     [HttpPost]
     public async Task<IActionResult> PostAsync([FromBody] Bin bin, CancellationToken cancellationToken) =>
-        (await mediator.Send(new CreateBinCommand(bin.Type, bin.Location, bin.Telemetry, bin.Status), cancellationToken))
-            .Match(created => CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id.ToString() }, created), Problem);
+        bin.Telemetry is null
+            ? BadRequest("Telemetry is required.")
+            : (await mediator.Send(new CreateBinCommand(bin.Type, bin.Location, bin.Telemetry, bin.Status), cancellationToken))
+                .Match(created => CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id.ToString() }, created), Problem);
 
     [HttpPost("{id}/telemetry")]
-    public async Task<IActionResult> PostTelemetryAsync(string id, [FromBody] BinTelemetry telemetry,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> PostTelemetryAsync(string id, [FromBody] BinTelemetry telemetry, CancellationToken cancellationToken)
     {
         var updateResult = await mediator.Send(new UpdateBinTelemetryCommand(id, telemetry), cancellationToken);
         if (updateResult.IsError)
@@ -76,18 +79,20 @@ public class BinsController(ISender mediator) : ApiController
         var binFaker = new Faker<Bin>()
             .RuleFor(b => b.Type, f => f.PickRandom<BinType>())
             .RuleFor(b => b.Status, f => f.PickRandom<BinStatus>())
-            .RuleFor(b => b.Location, f => new GeoPoint([f.Address.Longitude(76.80, 77.00), f.Address.Latitude(43.20, 43.30)]))
+            .RuleFor(b => b.Location, f => new GeoPoint(f.Address.Longitude(76.80, 77.00), f.Address.Latitude(43.20, 43.30)))
             .RuleFor(b => b.Telemetry, f => telemetryFaker.Generate())
-            .RuleFor(b => b.TelemetryHistory, f => telemetryFaker.Generate(f.Random.Int(1, 5)).ToArray())
-            .RuleFor(b => b.CreatedAt, f => f.Date.Past(1))
-            .RuleFor(b => b.UpdatedAt, f => DateTime.UtcNow);
+            .RuleFor(b => b.TelemetryHistory, f => telemetryFaker.Generate(f.Random.Int(1, 5)))
+            .RuleFor(b => b.CreatedAt, f => f.Date.Past(1));
 
         int successCount = 0;
         foreach (var bin in binFaker.Generate(count))
         {
-            var result = await mediator.Send(new CreateBinCommand(bin.Type, bin.Location, bin.Telemetry, bin.Status), cancellationToken);
-            if (!result.IsError)
-                successCount++;
+            if (bin.Telemetry is not null)
+            {
+                var result = await mediator.Send(new CreateBinCommand(bin.Type, bin.Location, bin.Telemetry, bin.Status), cancellationToken);
+                if (!result.IsError)
+                    successCount++;
+            }
         }
 
         return Ok(new { message = $"Successfully seeded {successCount} out of {count} bins in Almaty region" });

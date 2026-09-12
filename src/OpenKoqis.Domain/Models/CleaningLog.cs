@@ -1,20 +1,11 @@
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization.Attributes;
-
 namespace OpenKoqis.Domain.Models;
 
-public class CleaningLog : IEntity
+public class CleaningLog(string id, string binId, string userId, int removedWeightKg, string notes) : Shared.Entity<string>(id)
 {
-    [BsonId]
-    [BsonRepresentation(BsonType.ObjectId)]
-    public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
-    public ObjectId BinId { get; set; }
-    public ObjectId UserId { get; set; }
-    public DateTime StartedAt { get; set; }
-    public DateTime FinishedAt { get; set; }
-    public int RemovedWeightKg { get; set; }
-    public required string Notes { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-    public DateTime UpdatedAt { get; set; }
+    public string BinId { get; } = binId;
+    public string UserId { get; } = userId;
+    public DateTime StartedAt { get; init; } = DateTime.UtcNow;
+    public DateTime FinishedAt { get; private set; } = DateTime.UtcNow;
+    public int RemovedWeightKg { get; } = removedWeightKg;
+    public string Notes { get; } = notes;
 }

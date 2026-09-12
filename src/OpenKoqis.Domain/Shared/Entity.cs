@@ -2,25 +2,17 @@ namespace OpenKoqis.Domain.Shared;
 
 public abstract class Entity<TId>(TId id) : IEquatable<Entity<TId>> where TId : IEquatable<TId>
 {
-    public TId Id { get; } = id;
+    public TId Id { get; init; } = id;
+    public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; protected set; } = DateTime.UtcNow;
 
-    public bool Equals(Entity<TId>? other)
-    {
-        if (other is null)
-            return false;
+    protected void MarkModified() => UpdatedAt = DateTime.UtcNow;
 
-        return ReferenceEquals(this, other) || other.Id.Equals(Id);
-    }
+    public bool Equals(Entity<TId>? other) =>
+        other is not null && (ReferenceEquals(this, other) || other.Id.Equals(Id));
 
-    public override bool Equals(object? obj)
-    {
-        if (obj is null)
-            return false;
-        if (ReferenceEquals(this, obj))
-            return true;
-
-        return obj.GetType() == GetType() && Equals((Entity<TId>)obj);
-    }
+    public override bool Equals(object? obj) =>
+        obj is not null && (ReferenceEquals(this, obj) || (obj.GetType() == GetType() && Equals((Entity<TId>)obj)));
 
     public override int GetHashCode() => EqualityComparer<TId>.Default.GetHashCode(Id);
 

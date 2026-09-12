@@ -2,7 +2,6 @@ using Mediator;
 using Microsoft.AspNetCore.Mvc;
 using OpenKoqis.Application.Features.CleaningLogs.Commands;
 using OpenKoqis.Application.Features.CleaningLogs.Queries;
-using OpenKoqis.Domain.Models;
 
 namespace OpenKoqis.Api.Controllers;
 
@@ -19,22 +18,20 @@ public class CleaningLogsController(ISender mediator) : ApiController
         (await mediator.Send(new GetCleaningLogByIdQuery(id), cancellationToken)).Match(Ok, Problem);
 
     [HttpPost]
-    public async Task<IActionResult> PostAsync([FromBody] CleaningLog log, CancellationToken cancellationToken) =>
-        (await mediator.Send(new CreateCleaningLogCommand(log), cancellationToken)).Match(
-            created => CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id }, created),
-            Problem);
+    public async Task<IActionResult> PostAsync([FromBody] CreateCleaningLogRequest req, CancellationToken cancellationToken) =>
+        (await mediator.Send(new CreateCleaningLogCommand(req.BinId, req.UserId, req.RemovedWeightKg, req.Notes), cancellationToken)).Match(
+            created => CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id }, created), Problem);
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteAsync(string id, CancellationToken cancellationToken) =>
         (await mediator.Send(new DeleteCleaningLogCommand(id), cancellationToken)).Match(
-            _ => NoContent(),
-            Problem);
+            _ => NoContent(), Problem);
 
+    public record CreateCleaningLogRequest(string BinId, string UserId, int RemovedWeightKg, string Notes);
     public record LogCleaningRequest(string BinId, string UserId, int RemovedKg, string? Notes = null);
 
     [HttpPost("log")]
     public async Task<IActionResult> LogCleaningAsync([FromBody] LogCleaningRequest req, CancellationToken cancellationToken) =>
         (await mediator.Send(new LogBinCleaningCommand(req.BinId, req.UserId, req.RemovedKg, req.Notes), cancellationToken)).Match(
-            created => CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id }, created),
-            Problem);
+            created => CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id }, created), Problem);
 }

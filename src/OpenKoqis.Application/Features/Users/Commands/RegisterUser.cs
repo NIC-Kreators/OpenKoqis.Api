@@ -27,17 +27,13 @@ public class RegisterUserCommandHandler(IMongoDatabase database, IJwtService jwt
             return UserErrors.NicknameConflict(dto.Nickname);
         }
 
-        var newUser = new User
-        {
-            Nickname = dto.Nickname,
-            FullName = dto.FullName,
-            Role = GuestRole.Instance,
-            PasswordHash = passwordHasher.HashPassword(dto.Password),
-            PasswordRecreationRequired = false,
-            PasswordLastChangedAt = DateTime.UtcNow,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
+        var newUser = new User(
+            id: MongoDB.Bson.ObjectId.GenerateNewId().ToString(),
+            nickname: dto.Nickname,
+            fullName: dto.FullName,
+            passwordHash: passwordHasher.HashPassword(dto.Password),
+            role: GuestRole.Instance
+        );
 
         await _collection.InsertOneAsync(newUser, cancellationToken: cancellationToken);
         logger.LogInformation("User {Nickname} registered and saved with ID: {UserId}", newUser.Nickname, newUser.Id);

@@ -1,6 +1,7 @@
 using ErrorOr;
 using Mediator;
 using Microsoft.Extensions.Logging;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using OpenKoqis.Domain.Models;
 
@@ -16,15 +17,14 @@ public class CreateAlertCommandHandler(IMongoDatabase database, ILogger<CreateAl
     {
         logger.LogInformation("Creating a new alert for BinId: {BinId}, Type: {Type}", request.BinId, request.Type);
 
-        var alert = new Alert
-        {
-            BinId = request.BinId,
-            Type = request.Type,
-            Severity = request.Severity,
-            Message = request.Message,
-            ValueAtTime = request.ValueAtTime,
-            CreatedAt = DateTime.UtcNow
-        };
+        var alert = new Alert(
+            id: ObjectId.GenerateNewId().ToString(),
+            binId: request.BinId,
+            type: request.Type,
+            severity: request.Severity,
+            message: request.Message,
+            valueAtTime: request.ValueAtTime
+        );
 
         await _collection.InsertOneAsync(alert, cancellationToken: cancellationToken);
         logger.LogInformation("Alert successfully persisted to database with ID: {Id}", alert.Id);

@@ -1,50 +1,32 @@
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization.Attributes;
-
 namespace OpenKoqis.Domain.Models;
 
-public struct GeoPoint
+public record GeoPoint(double Longitude, double Latitude);
+
+public enum BinStatus { Active, Inactive, Maintenance }
+public enum BinType { Dumpster, CityBin }
+
+public class Bin(string id, BinType type, GeoPoint location, BinStatus status) : Shared.Entity<string>(id)
 {
-    [BsonElement("type")]
-    public string Type { get; set; } = "Point";
+    public BinType Type { get; } = type;
+    public GeoPoint Location { get; private set; } = location;
+    public BinTelemetry? Telemetry { get; private set; }
+    public List<BinTelemetry> TelemetryHistory { get; } = [];
+    public BinStatus Status { get; private set; } = status;
 
-    [BsonElement("coordinates")]
-    public double[] Coordinates { get; set; } // [longitude, latitude]
-
-    public GeoPoint(double[] coordinates)
+    public void UpdateTelemetry(BinTelemetry telemetry)
     {
-        if (coordinates.Length != 2)
-            throw new ArgumentException("Coordinates must contain exactly two elements: [longitude, latitude].");
+        Telemetry = telemetry;
+        TelemetryHistory.Add(telemetry);
 
-        Coordinates = coordinates;
+        if (telemetry.IsSmokeDetected)
+            Status = BinStatus.Maintenance;
+
+        MarkModified();
     }
-}
 
-public enum BinStatus
-{
-    Active,
-    Inactive,
-    Maintenance,
-}
-
-public enum BinType
-{
-    Dumpster,
-    CityBin,
-}
-
-public class Bin : IEntity
-{
-    [BsonId]
-    [BsonRepresentation(BsonType.ObjectId)]
-    public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
-
-    public BinType Type { get; set; }
-    public GeoPoint Location { get; set; }
-    public required BinTelemetry Telemetry { get; set; }
-    public BinTelemetry[] TelemetryHistory { get; set; } = [];
-    public BinStatus Status { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-    public DateTime UpdatedAt { get; set; }
+    public void ChangeStatus(BinStatus status)
+    {
+        Status = status;
+        MarkModified();
+    }
 }

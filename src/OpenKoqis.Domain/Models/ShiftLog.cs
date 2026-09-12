@@ -1,20 +1,22 @@
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization.Attributes;
-
 namespace OpenKoqis.Domain.Models;
 
-public class ShiftLog : IEntity
+public class ShiftLog(string id, string userId, string route) : Shared.Entity<string>(id)
 {
-    [BsonId]
-    [BsonRepresentation(BsonType.ObjectId)]
-    public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
-    public ObjectId UserId { get; set; }
-    public DateTime StartedAt { get; set; }
-    public DateTime EndedAt { get; set; }
-    public List<ObjectId> CleanedBins { get; set; } = [];
-    public double DistanceTravelledKm { get; set; }
-    public required string Route { get; set; }
+    public string UserId { get; } = userId;
+    public DateTime StartedAt { get; init; } = DateTime.UtcNow;
+    public DateTime? EndedAt { get; private set; }
+    public List<string> CleanedBins { get; } = [];
+    public double DistanceTravelledKm { get; private set; }
+    public string Route { get; } = route;
 
-    public DateTime CreatedAt { get; set; }
-    public DateTime UpdatedAt { get; set; }
+    public void EndShift(IEnumerable<string> cleanedBins, double distance)
+    {
+        if (EndedAt is not null)
+            return;
+
+        EndedAt = DateTime.UtcNow;
+        CleanedBins.AddRange(cleanedBins);
+        DistanceTravelledKm = distance;
+        MarkModified();
+    }
 }

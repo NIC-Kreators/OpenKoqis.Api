@@ -16,13 +16,9 @@ public class CreateUserCommandHandler(IMongoDatabase database, ILogger<CreateUse
     {
         logger.LogInformation("Creating new user with Nickname: {Nickname}", request.User.Nickname);
 
-        var user = request.User;
-        user.CreatedAt = DateTime.UtcNow;
-        user.UpdatedAt = user.CreatedAt;
+        await _collection.InsertOneAsync(request.User, cancellationToken: cancellationToken);
+        logger.LogInformation("User {Nickname} inserted into database", request.User.Nickname);
 
-        await _collection.InsertOneAsync(user, cancellationToken: cancellationToken);
-        logger.LogInformation("User {Nickname} inserted into database", user.Nickname);
-
-        return user;
+        return request.User;
     }
 }
