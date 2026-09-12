@@ -2,7 +2,6 @@ using System.Buffers;
 using System.Text;
 using System.Text.Json;
 using Mediator;
-using Microsoft.Extensions.DependencyInjection;
 using MQTTnet;
 using OpenKoqis.Application.Features.Bins.Commands;
 using OpenKoqis.Domain.Models;

@@ -1,9 +1,7 @@
-using ErrorOr;
 using Mediator;
 using Microsoft.AspNetCore.Mvc;
 using OpenKoqis.Application.Features.ShiftLogs.Commands;
 using OpenKoqis.Application.Features.ShiftLogs.Queries;
-using OpenKoqis.Domain.Models;
 
 namespace OpenKoqis.Api.Controllers;
 

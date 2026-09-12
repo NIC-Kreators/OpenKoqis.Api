@@ -1,5 +1,4 @@
 using Bogus;
-using ErrorOr;
 using Mediator;
 using Microsoft.AspNetCore.Mvc;
 using OpenKoqis.Application.Features.Alerts.Commands;

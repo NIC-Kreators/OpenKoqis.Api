@@ -1,6 +1,4 @@
-using Microsoft.Extensions.Options;
 using MongoDB.Driver;
-using OpenKoqis.Api.Options;
 using OpenKoqis.Domain.Models;
 
 namespace OpenKoqis.Api.Services;
