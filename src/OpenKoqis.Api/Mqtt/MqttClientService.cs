@@ -1,100 +1,84 @@
+using System.Buffers;
 using System.Text;
 using System.Text.Json;
+using Mediator;
 using MQTTnet;
-using OpenKoqis.Application.Services;
+using OpenKoqis.Application.Features.Bins.Commands;
 using OpenKoqis.Domain.Models;
 
 namespace OpenKoqis.Api.Mqtt;
 
-public class MqttClientService : BackgroundService
+public class MqttClientService(
+    IConfiguration config,
+    ILogger<MqttClientService> logger,
+    IServiceScopeFactory serviceScopeFactory) : BackgroundService
 {
-    private readonly ILogger<MqttClientService> _logger;
-    private readonly IMqttClient _client;
-    private readonly MqttClientOptions _options;
-    private readonly MqttClientSubscribeOptions _subscribeOptions;
+    private readonly IMqttClient _client = new MqttClientFactory().CreateMqttClient();
+    private readonly MqttClientOptions _options = BuildOptions(config);
+    private readonly MqttClientSubscribeOptions _subscribeOptions = BuildSubscribeOptions(config);
 
-    public MqttClientService(IConfiguration config, ILogger<MqttClientService> logger, IBinService binService)
+    private static MqttClientOptions BuildOptions(IConfiguration config)
     {
-        _logger = logger;
-
-        var factory = new MqttClientFactory();
-        _client = factory.CreateMqttClient();
-        var optionsBuilder = new MqttClientOptionsBuilder()
+        var builder = new MqttClientOptionsBuilder()
             .WithTcpServer(config.GetValue<string>("MQTT_HOST"), config.GetValue<int>("MQTT_PORT"))
             .WithClientId(config.GetValue<string>("MQTT_CLIENT_ID"));
 
-        _logger.LogDebug("Options for MQTT server is defined");
-
-        var isMqttAllowedAnonymous = config.GetValue<bool>("MQTT_ALLOW_ANONYMOUS");
-
-        if (!isMqttAllowedAnonymous)
+        if (!config.GetValue<bool>("MQTT_ALLOW_ANONYMOUS"))
         {
-            _logger.LogInformation("MQTT is not allowed anonymous connection. Configure username and password");
-            optionsBuilder = optionsBuilder.WithCredentials(config.GetValue<string>("MQTT_USERNAME"), config.GetValue<string>("MQTT_PASSWORD"));
+            builder.WithCredentials(config.GetValue<string>("MQTT_USERNAME"), config.GetValue<string>("MQTT_PASSWORD"));
         }
 
-        _options = optionsBuilder.Build();
+        return builder.Build();
+    }
 
-        _logger.LogInformation("Options for MQTT server was built");
-
-
-        // MQTT message receiving
-        //_client.ApplicationMessageReceivedAsync += e =>
-        //{
-        //    var topic = e.ApplicationMessage.Topic;
-        //    var payload = Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
-
-        //    _logger.LogDebug("Received message on topic \'{Topic}\': {Payload}", topic, payload);
-        //    return Task.CompletedTask;
-        //};
-        _client.ApplicationMessageReceivedAsync += async e =>
-        {
-            var topic = e.ApplicationMessage.Topic;
-            var payload = Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
-
-            var binId = topic.Split('/')[1];
-
-            var telemetry = JsonSerializer.Deserialize<BinTelemetry>(payload);
-
-            if (telemetry is null)
-            {
-                _logger.LogWarning("Received invalid telemetry data for bin {Id}: {Payload}", binId, payload);
-                return;
-            }
-
-            await binService.UpdateTelemetryAsync(binId, telemetry);
-            await binService.UpdateTelemetryHistoryAsync(binId, telemetry);
-
-            _logger.LogInformation("Updated bin {Id} via MQTT", binId);
-        };
-
-        var subscribeOptionsFilter = new MqttClientSubscribeOptionsBuilder();
+    private static MqttClientSubscribeOptions BuildSubscribeOptions(IConfiguration config)
+    {
+        var filterBuilder = new MqttClientSubscribeOptionsBuilder();
         var topics = config.GetSection("Mqtt:Topics").Get<string[]>() ?? [];
 
-        _logger.LogInformation("Topics for MQTT server are: {Topics}", string.Join(", ", topics));
-
         foreach (var topic in topics)
-            subscribeOptionsFilter.WithTopicFilter(topic);
+        {
+            filterBuilder.WithTopicFilter(topic);
+        }
 
-        _subscribeOptions = subscribeOptionsFilter.Build();
-
-        _logger.LogInformation("Subscribe Options for MQTT server was built");
+        return filterBuilder.Build();
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
+        _client.ApplicationMessageReceivedAsync += async e =>
+        {
+            var binId = e.ApplicationMessage.Topic.Split('/')[1];
+            var payload = Encoding.UTF8.GetString(e.ApplicationMessage.Payload.ToArray());
+            var telemetry = JsonSerializer.Deserialize<BinTelemetry>(payload);
+
+            if (telemetry is null)
+            {
+                logger.LogWarning("Invalid telemetry data for bin {Id}: {Payload}", binId, payload);
+                return;
+            }
+
+            using var scope = serviceScopeFactory.CreateScope();
+            var mediator = scope.ServiceProvider.GetRequiredService<ISender>();
+            var result = await mediator.Send(new UpdateBinTelemetryCommand(binId, telemetry), ct);
+
+            result.Switch(
+                _ => logger.LogInformation("Updated bin {Id} via MQTT", binId),
+                errors => logger.LogWarning("Failed to update telemetry for bin {Id}. Errors: {Errors}",
+                    binId, string.Join(", ", errors.Select(err => err.Description)))
+            );
+        };
+
         await _client.ConnectAsync(_options, ct);
-        _logger.LogInformation("Connected to MQTT server");
-
         await _client.SubscribeAsync(_subscribeOptions, ct);
-        _logger.LogInformation("Subscribed to MQTT topics");
+        logger.LogInformation("Subscribed to MQTT topics and connected successfully");
 
-        // Keep process alive for the lifetime of the server
         while (!ct.IsCancellationRequested)
+        {
             await Task.Delay(1000, ct);
+        }
 
-        _logger.LogInformation("Disconnected from MQTT server");
-        // ReSharper disable once MethodSupportsCancellation
         await _client.DisconnectAsync(cancellationToken: ct);
+        logger.LogInformation("Disconnected from MQTT server");
     }
 }

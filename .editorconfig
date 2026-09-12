@@ -11,7 +11,7 @@ trim_trailing_whitespace = true
 insert_final_newline = true
 
 [*.{yml,yaml,json,xml,config,props,targets,csproj,sln,slnx}]
-indent_size = 2
+indent_size = 4
 
 [*.md]
 trim_trailing_whitespace = false
@@ -236,7 +236,7 @@ dotnet_naming_style.camel_case.capitalization = camel_case
 dotnet_diagnostic.IDE0058.severity = none      # unused expression value — too noisy for fluent/test code
 dotnet_diagnostic.CA1062.severity = none       # null-check public args — relax for internal layered app
 dotnet_diagnostic.CA1031.severity = suggestion # catching general exceptions — fine in API boundary/middleware
-dotnet_diagnostic.IDE0005.severity = suggestion # unused using directives — greyed out in IDE, won't fail dotnet build
+dotnet_diagnostic.IDE0005.severity = warning # unused using directives — greyed out in IDE, won't fail dotnet build
 
 [*.sh]
 end_of_line = lf

@@ -24,14 +24,12 @@ builder.Services.AddAuthorizationSecPolicies();
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
-
+builder.Services.AddMediator(cfg => cfg.ServiceLifetime = ServiceLifetime.Scoped);
 builder.Services
     .AddScoped<MqttClientService>()
-    .AddScoped<IUserService, UserService>()
-    .AddScoped<IBinService, BinService>()
     .AddScoped<IJwtService, JwtService>()
-    .AddScoped<IPasswordHasher, BCryptPasswordHasher>()
-    .AddScoped<IAlertService, AlertService>();
+    .AddScoped<IPasswordHasher, BCryptPasswordHasher>();
+
 
 
 var app = builder.Build();

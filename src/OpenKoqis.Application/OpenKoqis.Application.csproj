@@ -7,14 +7,19 @@
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
         <NuGetAuditMode>direct</NuGetAuditMode>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="MongoDB.Driver" Version="3.11.1" />
+        <PackageReference Include="ErrorOr" Version="2.1.1" />
+        <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
+        <PackageReference Include="Mediator.Abstractions" Version="3.1.0-rc.1" />
+        <PackageReference Include="MongoDB.Driver" Version="3.11.1" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\OpenKoqis.Domain\OpenKoqis.Domain.csproj" />
+        <ProjectReference Include="..\OpenKoqis.Domain\OpenKoqis.Domain.csproj" />
     </ItemGroup>
 
 </Project>
