@@ -1,6 +1,6 @@
 using ErrorOr;
 
-namespace OpenKoqis.Application.Features.Alerts;
+namespace OpenKoqis.Application.Features.Alerts.Errors;
 
 public static class AlertErrors
 {

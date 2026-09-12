@@ -1,6 +1,6 @@
 using ErrorOr;
 
-namespace OpenKoqis.Application.Features.ShiftLogs;
+namespace OpenKoqis.Application.Features.ShiftLogs.Errors;
 
 public static class ShiftLogErrors
 {

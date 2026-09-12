@@ -24,7 +24,7 @@ public class ShiftLogsController(ISender mediator) : ApiController
     [HttpPost("start")]
     public async Task<IActionResult> StartAsync([FromBody] StartShiftRequest req, CancellationToken cancellationToken) =>
         (await mediator.Send(new StartShiftCommand(req.UserId), cancellationToken)).Match(
-            created => CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id }, created),
+            created => CreatedAtAction("GetById", new { id = created.Id }, created),
             Problem);
 
     public record EndShiftRequest(DateTime? EndedAt, IEnumerable<string>? CleanedBinIds, double DistanceKm, string? Route = null);

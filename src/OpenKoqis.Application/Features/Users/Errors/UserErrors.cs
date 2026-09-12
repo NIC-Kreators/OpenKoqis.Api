@@ -1,6 +1,6 @@
 using ErrorOr;
 
-namespace OpenKoqis.Application.Features.Users;
+namespace OpenKoqis.Application.Features.Users.Errors;
 
 public static class UserErrors
 {
@@ -15,7 +15,7 @@ public static class UserErrors
             description: $"User with nickname '{nickname}' already exists.");
 
     public static Error InvalidCredentials =>
-        Error.Validation(
+        Error.Unauthorized(
             code: "User.InvalidCredentials",
             description: "Invalid nickname or password.");
 }

@@ -2,6 +2,7 @@ using ErrorOr;
 using Mediator;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
+using OpenKoqis.Application.Features.Alerts.Errors;
 using OpenKoqis.Domain.Models;
 
 namespace OpenKoqis.Application.Features.Alerts.Commands;

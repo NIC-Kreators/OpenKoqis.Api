@@ -2,6 +2,7 @@ using ErrorOr;
 using Mediator;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
+using OpenKoqis.Application.Features.Bins.Errors;
 using OpenKoqis.Domain.Models;
 
 namespace OpenKoqis.Application.Features.Bins.Queries;

@@ -3,6 +3,7 @@ using Mediator;
 using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using OpenKoqis.Application.Features.ShiftLogs.Errors;
 using OpenKoqis.Domain.Models;
 
 namespace OpenKoqis.Application.Features.ShiftLogs.Commands;

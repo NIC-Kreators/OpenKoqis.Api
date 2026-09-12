@@ -1,6 +1,6 @@
 using ErrorOr;
 
-namespace OpenKoqis.Application.Features.CleaningLogs;
+namespace OpenKoqis.Application.Features.CleaningLogs.Errors;
 
 public static class CleaningLogErrors
 {

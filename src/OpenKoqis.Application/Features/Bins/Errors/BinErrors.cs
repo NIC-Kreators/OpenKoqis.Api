@@ -1,6 +1,6 @@
 using ErrorOr;
 
-namespace OpenKoqis.Application.Features.Bins;
+namespace OpenKoqis.Application.Features.Bins.Errors;
 
 public static class BinErrors
 {
