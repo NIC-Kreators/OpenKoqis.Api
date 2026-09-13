@@ -5,16 +5,15 @@ namespace OpenKoqis.Api.Services;
 
 public class MongoDbService
 {
+    private const string UsersCollectionName = "Users";
+    private const string BinsCollectionName = "Bins";
+
     public IMongoCollection<User> Users { get; }
     public IMongoCollection<Bin> Bins { get; }
 
-    public MongoDbService(IConfiguration config)
+    public MongoDbService(IMongoDatabase database)
     {
-        var mongo = config.GetSection("MongoDB");
-        var client = new MongoClient(config.GetValue<string>("MONGO_CONNECTION_STRING"));
-        var db = client.GetDatabase(mongo["DatabaseName"]);
-
-        Users = db.GetCollection<User>(mongo["UsersCollection"]);
-        Bins = db.GetCollection<Bin>(mongo["BinsCollection"]);
+        Users = database.GetCollection<User>(UsersCollectionName);
+        Bins = database.GetCollection<Bin>(BinsCollectionName);
     }
 }

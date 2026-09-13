@@ -1,0 +1,52 @@
+using ErrorOr;
+using Mediator;
+using Microsoft.Extensions.Logging;
+using MongoDB.Bson;
+using MongoDB.Driver;
+using OpenKoqis.Application.Features.CleaningLogs.Errors;
+using OpenKoqis.Domain.Models;
+
+namespace OpenKoqis.Application.Features.CleaningLogs.Commands;
+
+public record LogBinCleaningCommand(string BinId, string UserId, int RemovedKg, string? Notes = null) : IRequest<ErrorOr<CleaningLog>>;
+
+public class LogBinCleaningCommandHandler(IMongoDatabase database, ILogger<LogBinCleaningCommandHandler> logger) : IRequestHandler<LogBinCleaningCommand, ErrorOr<CleaningLog>>
+{
+    private readonly IMongoCollection<CleaningLog> _logCollection = database.GetCollection<CleaningLog>("CleaningLogs");
+    private readonly IMongoCollection<Bin> _binCollection = database.GetCollection<Bin>("Bins");
+
+    public async ValueTask<ErrorOr<CleaningLog>> Handle(LogBinCleaningCommand request, CancellationToken cancellationToken)
+    {
+        logger.LogInformation("Starting LogCleaning process for Bin: {BinId} by User: {UserId}", request.BinId, request.UserId);
+
+        var binExists = await _binCollection.Find(b => b.Id == request.BinId).AnyAsync(cancellationToken);
+        if (!binExists)
+        {
+            logger.LogWarning("LogCleaning failed: Bin {BinId} does not exist", request.BinId);
+            return CleaningLogErrors.BinNotFound(request.BinId);
+        }
+
+        var cleaning = new CleaningLog
+        {
+            BinId = ObjectId.Parse(request.BinId),
+            UserId = ObjectId.Parse(request.UserId),
+            StartedAt = DateTime.UtcNow,
+            FinishedAt = DateTime.UtcNow,
+            RemovedWeightKg = request.RemovedKg,
+            Notes = request.Notes ?? string.Empty,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        await _logCollection.InsertOneAsync(cleaning, cancellationToken: cancellationToken);
+
+        var binUpdate = Builders<Bin>.Update
+            .Set(b => b.Status, BinStatus.Active)
+            .Set(b => b.UpdatedAt, DateTime.UtcNow);
+
+        await _binCollection.UpdateOneAsync(b => b.Id == request.BinId, binUpdate, cancellationToken: cancellationToken);
+        logger.LogInformation("Cleaning process completed. Recorded {Weight}kg removed", request.RemovedKg);
+
+        return cleaning;
+    }
+}
