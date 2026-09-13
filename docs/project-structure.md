@@ -166,17 +166,17 @@ point of this layout; untested boundaries are just a folder convention.
 
 ## Implementation status
 
-| Item                        | Status | Notes                                      |
-|-----------------------------|--------|--------------------------------------------|
-| Modular layout              | ⚪     | `src/` is a flat four-project solution     |
-| `Shared.Kernel`             | ⚪     |                                            |
-| `Shared.Api`                | ⚪     |                                            |
-| Humans module               | ⚪     |                                            |
-| Geography module            | ⚪     |                                            |
-| BinVentory module           | ⚪     |                                            |
-| TimeMachine module          | ⚪     |                                            |
-| TruckBrain module           | ⚪     |                                            |
-| `OpenKoqis.Host`            | 🟡     | Exists as `OpenKoqis.Api`, not a pure root |
-| `OpenKoqis.AppHost`         | 🟡     | Scaffolded, not in the solution file yet   |
-| `OpenKoqis.ServiceDefaults` | 🟡     | Scaffolded, not in the solution file yet   |
-| Architecture tests          | ⚪     | No test projects in the solution           |
+| Item                        | Status | Notes                                        |
+|-----------------------------|--------|----------------------------------------------|
+| Modular layout              | ⚪     | `src/` is a flat four-project solution       |
+| `Shared.Kernel`             | ⚪     |                                              |
+| `Shared.Api`                | ⚪     |                                              |
+| Humans module               | ⚪     |                                              |
+| Geography module            | ⚪     |                                              |
+| BinVentory module           | ⚪     |                                              |
+| TimeMachine module          | ⚪     |                                              |
+| TruckBrain module           | ⚪     |                                              |
+| `OpenKoqis.Host`            | 🟡     | `OpenKoqis.Api` is host + controllers + MQTT |
+| `OpenKoqis.AppHost`         | 🟡     | `OpenKoqis.Api.AppHost`; Mongo + Mosquitto   |
+| `OpenKoqis.ServiceDefaults` | 🟢     | `OpenKoqis.Api.ServiceDefaults`              |
+| Architecture tests          | ⚪     | No test projects in the solution             |
