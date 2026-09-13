@@ -1,301 +1,243 @@
 # Domain Model
 
-Self-hosted garbage management system — entities, value objects, and aggregate boundaries.
+Self-hosted garbage management system — bounded contexts, aggregates, and the
+relationships between them.
 
-This document lives at `docs/domain-model.md` per the project's docs structure.
+> [!warning] This is not documentation of the current codebase.
+> It describes the **desired** state of the domain, not what is implemented today.
+> The project is in active development and `src/` lags behind — when the two
+> disagree, the code is the thing that's wrong. See [README.md](README.md) for the
+> convention, and the status table at the bottom of this document for how far along
+> each piece is.
 
-Two different things are happening in the diagram below, and they're easy to
-conflate: **modules** group related aggregates inside one Bounded Context for
-readability — same database, same transactions, same ubiquitous language, just
-organized. A **Bounded Context** is the real boundary — a different model, different
-language, typically a different team or service. `Identity`, `Geography`, `Assets`,
-and `FieldOperations` are modules inside one context, `OpenKoqis.Core`. `RoutingEngine`
-is the one actual second Bounded Context shown here — it gets its own model, its own
-storage, and only an empty stub box on this diagram (see Boundaries below).
+Field-level definitions (properties, types, value objects) live in
+[data-model.md](data-model.md). This document covers only the shape of the domain:
+what the contexts are, what lives in each, and how they reference each other.
+
+## Contexts
+
+Five Bounded Contexts. Each has its own model and its own ubiquitous language; only
+three of them are required for the system to function.
+
+| Context | Status | Holds |
+| --- | --- | --- |
+| **Humans** | core | `Role`, `User`, `Identity` (Keycloak) |
+| **BinVentory** | core | `Bin`, `BinGroup` |
+| **TruckBrain** | core | `RouteEngine`, `Route` |
+| **Geography** | optional | `Location` |
+| **TimeMachine** | optional | `BinCleaning`, `BinHistory`, `Alert` |
+
+**Geography** can be switched off entirely — the system is usable with zero
+`Location`s, with bins addressed purely by their coordinates. Every reference to a
+location is therefore nullable by design, not by accident.
+
+**TimeMachine** can be switched off too: it holds the historical and event-shaped
+records (telemetry history, cleaning log, alerts). Without it, a bin still has a
+current state; it just has no past.
 
 ## Diagram
 
 ```mermaid
 classDiagram
-    namespace Identity {
-        class User {
+    namespace Humans {
+        class Identity {
             <<Aggregate Root>>
-            +Guid Id
-            +string Name
-            +UserRole Role
-            +Guid? LocationId
+            may be external
         }
 
-        class UserRole {
-            <<Enumeration>>
-            Root
-            Admin
-            Dispatcher
-            Driver
-            TechnicalSpecialist
+        class User {
+            <<Aggregate Root>>
+        }
+
+        class Role {
+            <<Aggregate Root>>
+            RBAC + ABAC
         }
     }
 
     namespace Geography {
         class Location {
             <<Aggregate Root>>
-            +Guid Id
-            +string Name
-            +Guid? ParentLocationId
         }
     }
 
-    namespace Assets {
+    namespace BinVentory {
         class Bin {
             <<Aggregate Root>>
-            +Guid Id
-            +BinType Type
-            +GeoPoint Coordinates
-            +Guid LocationId
-            +BinTelemetry Telemetry
-            +BinStatus Status
+            IRoutingDestination
         }
 
-        class BinType {
-            <<Enumeration>>
-            CityBin
-            Dumpster
-        }
-
-        class BinStatus {
-            <<Enumeration>>
-            Active
-            Cleaning
-            Inactive
-        }
-
-        class BinTelemetry {
-            <<Value Object>>
-            +float FillLevel
-            +bool IsSmokeDetected
-            +DateTime LastUpdatedAt
-        }
-
-        class GeoPoint {
-            <<Value Object>>
-            +double Latitude
-            +double Longitude
-        }
-
-        class BinPlacementRequest {
+        class BinGroup {
             <<Aggregate Root>>
-            +Guid Id
-            +Guid TechnicalSpecialistId
-            +Guid? ShiftId
-            +string LocationDescription
-            +string SetupDetails
+            IRoutingDestination
+        }
+    }
+
+    namespace TimeMachine {
+        class BinCleaning {
+            <<Aggregate Root>>
+        }
+
+        class BinHistory {
+            <<Aggregate Root>>
         }
 
         class Alert {
             <<Aggregate Root>>
-            +Guid Id
-            +Guid BinId
-            +AlertType Type
-            +DateTime CreatedAt
-        }
-
-        class AlertType {
-            <<Enumeration>>
-            HighFillLevel
-            SmokeDetected
-            AnimalDetected
-            ConnectionLost
         }
     }
 
-    namespace FieldOperations {
-        class Shift {
-            <<Aggregate Root>>
-            +Guid Id
-            +Guid UserId
-            +DateTime StartedAt
-            +DateTime? EndedAt
-        }
-
-        class Cleaning {
-            <<Domain Event>>
-            +Guid Id
-            +Guid DriverId
-            +Guid BinId
-            +Guid? ShiftId
-            +DateTime CompletedAt
-        }
-
-        class Route {
-            <<Aggregate Root>>
-            +Guid Id
-            +Guid ShiftId
-            +RouteStatus Status
-            +DateTime BuiltAt
-            +RouteStop[] PlannedStops
-            +RouteStop[] ActualStops
-        }
-
-        class RouteStatus {
-            <<Enumeration>>
-            Planned
-            InProgress
-            Completed
-            Abandoned
-        }
-
-        class RouteStop {
-            <<Value Object>>
-            +int Sequence
-            +Guid BinId
-            +DateTime? ArrivedAt
-            +RouteStopStatus Status
-        }
-
-        class RouteStopStatus {
-            <<Enumeration>>
-            Pending
-            Visited
-            Skipped
+    namespace TruckBrain {
+        class RouteEngine {
+            <<Black Box>>
         }
     }
 
-    namespace RoutingEngine_SeparateContext {
-        class RoutingEngine {
-            <<External Bounded Context>>
-        }
-    }
+    Identity "1" --> "1" User : authenticates
+    Role "1" --> "0..*" User : grants Access to
+    User "0..*" --> "0..1" Location : LocatedAt
+    Bin "0..*" --> "0..1" Location : LocatedAt
+    BinGroup "0..*" --> "0..1" Location : LocatedAt
+    Bin "0..*" --> "0..1" BinGroup : CAN be in group
+    Alert "0..*" --> "1" Bin : raised on
+    BinCleaning "0..*" --> "1" Bin : performed on
+    BinHistory "0..*" --> "1" Bin : recorded for
+    RouteEngine ..> Bin : Destination
+    RouteEngine ..> BinGroup : Destination
 
-    User "0..*" --> "0..1" Location : pinned to
-    Location "0..1" --> "0..*" Location : sub-areas of
-    Bin "0..*" --> "1" Location : pinned to
-    Bin "1" *-- "1" BinTelemetry : has
-    Bin "1" *-- "1" GeoPoint : Coordinates
-    User "1" --> "0..*" Shift : works
-    Shift "1" --> "0..*" Cleaning : performs
-    Shift "1" --> "0..*" Route : builds
-    Route "1" *-- "0..*" RouteStop : planned/actual stops
-    Bin "1" --> "0..*" Cleaning : cleaned via
-    User "1" --> "0..*" BinPlacementRequest : assigned (Technical Specialist)
-    BinPlacementRequest "0..*" --> "0..1" Shift : fulfilled during
-    BinPlacementRequest "1" --> "0..*" Bin : creates
-    Bin "1" --> "0..*" Alert : raises
-    RoutingEngine ..> Route : reports stop arrivals into
-
-    note for User "LocationId only applies to Driver and Dispatcher roles"
-    note for Shift "UserId must belong to a Driver or TechnicalSpecialist — not type-enforced, same pattern as LocationId on User"
-    note for Cleaning "Immutable once created, no invariants to protect — a Domain Event, not an Aggregate Root"
-    note for Route "PlannedStops set when RoutingEngine builds the route; ActualStops appended as arrivals are reported back"
+    note for Location "Optional context. The app is fully usable with no Locations at all."
+    note for RouteEngine "Unknown structure. Consumes IRoutingDestination, returns a Route."
+    note for Bin "Caches CurrentTelemetry and ActiveAlert from TimeMachine — see Open questions"
 ```
 
-*(If your Mermaid renderer predates `namespace` support for class diagrams, the
-grouping boxes won't show, but the stereotypes and arrows still render fine.)*
+## Humans (core)
 
-## Entities & value objects
+**`Identity`** — Authentication, delegated to **Keycloak**. The domain stores no
+credential of any kind; `User` keeps only the profile and authorization data that
+belong to this system, linked to a Keycloak subject.
 
-### Identity
+**`Role`** — A named bundle of `Access` entries, each pairing a resource with the
+actions allowed on it. Roles are a convenience for assigning the same access to many
+users, not the authorization mechanism itself — `Access` is.
 
-**`User` (aggregate root)** — Inspired by Grafana/AWS-style account models: a single
-`Root` user manages the account, with `Admin`, `Dispatcher`, `Driver`, and
-`TechnicalSpecialist` as the other roles. Only `Driver` and `Dispatcher` are
-meaningfully pinned to a `Location` — the field exists on `User` but is conceptually
-optional/unused for the other roles.
+Authorization is **RBAC and ABAC together, or either one alone**. An operator can run
+with roles only, with attribute rules only, or with both layered. Which the market
+actually wants is unknown, so the model keeps all three viable rather than committing
+early.
 
-### Geography
+`Resource` is shared vocabulary, but each module declares the resources it owns —
+BinVentory says `bin` exists, Humans never learns what a bin is. The full list is
+composed at startup for role-building UIs. See
+[data-model.md](data-model.md) for the mechanism.
 
-**`Location` (aggregate root)** — A physical place — typically a city, or a sub-area
-of a city if it's too large for drivers to cover as one unit. Self-referencing
-(`ParentLocationId`) so a city can have child areas without a separate `Area` entity.
+**`User`** — A person in the system. Effective permissions are computed, not stored:
+`Role.Access` merged with the user's own `DedicatedAccess`, so a single user can be
+granted something without inventing a role for them. `IsRoot` is the escape hatch that
+bypasses the check. Soft-deleted with a 7-day retention window before the record
+actually goes.
 
-### Assets
+A `User` is optionally `LocatedAt` a `Location` — the field is meaningless when
+Geography is disabled.
 
-**`Bin` (aggregate root)** — The physical bin. Owns `Coordinates` and `Telemetry` as
-value objects — part of the bin's current state, not separate entities with their own
-identity. `TelemetryHistory` stays out of the domain model entirely, kept in InfluxDB
-instead.
+## BinVentory (core)
 
-**`BinPlacementRequest` (aggregate root)** — A request to a `TechnicalSpecialist` to
-set up bins at a location (e.g. "5 dumpsters at address X"). References the bins it
-results in once they're created, and optionally the `Shift` it was fulfilled during.
+**`Bin`** — The physical container, and the center of the model. Carries its own
+coordinates so it is addressable with Geography switched off, its lifecycle `State`
+(`Working` / `Cleaning` / `NotAvailable` / `Disabled`), and its `BinType`
+(`Dumpster` / `CityBin`). It also caches the latest telemetry reading and the
+currently-open alert for read performance.
 
-**`Alert` (aggregate root)** — Created and dispatched when something needs attention
-on a bin — fill level above threshold, smoke detected, animal in the bin, connection
-lost, etc. Kept as its own root rather than a child of `Bin` so acknowledging an alert
-never has to lock or load the whole bin aggregate.
+**`BinGroup`** — A cluster of bins collected at one point — the case where a truck
+servicing one of them services all of them, so routing should treat them as a single
+stop. Holds a cached fill level computed from its members.
 
-### Field operations
+Both implement **`IRoutingDestination`**: the contract TruckBrain consumes. That is
+the whole of the coupling between BinVentory and TruckBrain — a destination is a point
+with a fill level and an id, not a `Bin`.
 
-**`Shift` (aggregate root)** — One working session for either a `Driver` or a
-`TechnicalSpecialist`. Previously modeled as two separate aggregates
-(`DriverShift`/`TechnicalSpecialistShift`); merged into one, since both enforced the
-identical invariant (a user can't have two open shifts at once) and nothing else about
-them actually differed at the aggregate level. `Cleaning` and `Route` pin to a
-`Shift`, `BinPlacementRequest` optionally does too.
+## Geography (optional)
 
-**`Cleaning` (Domain Event, not an aggregate root)** — Recorded when a driver finishes
-cleaning a bin. Immutable once created — there's no rule to enforce on write, it's
-just a fact that happened. That's the distinction from `Shift`/`Route`/`Alert`: those
-have state transitions and invariants to protect, `Cleaning` doesn't, so it doesn't
-get the Aggregate Root label even though it has its own identity and is queried
-independently (e.g. "all cleanings for this bin this month").
+**`Location`** — A named place: a city, or a sub-area of one when a city is too large
+to be covered as a single unit. Self-referencing via `ParentLocationId`, so the
+hierarchy is arbitrarily deep without a separate `Area` type. A location is either a
+single point or, given three or more points, an area.
 
-**`Route` (aggregate root)** — The business record of a driver's route for a shift —
-not the routing computation itself, which lives in `OpenKoqis.RoutingEngine`. Holds
-two ordered stop lists: `PlannedStops` (what RoutingEngine built) and `ActualStops`
-(what happened, appended stop-by-stop). Each `RouteStop` is a sequence number, a bin,
-a status, and an arrival timestamp — not a GPS trace. A shift can have more than one
-`Route` if it gets rebuilt mid-shift; each rebuild is its own historical record rather
-than an overwrite.
+Nothing in the system requires a `Location` to exist. `User`, `Bin`, and `BinGroup`
+all reference it optionally, and disabling the context means those references are
+simply never set.
 
-### Value objects
-No identity of their own — defined entirely by their attributes, living inside the
-aggregate that owns them: `BinTelemetry` (a bin's latest reading), `GeoPoint`
-(`Bin.Coordinates`), and `RouteStop` (one stop in a `Route`'s planned or actual list —
-modeled as a value object since nothing outside `Route` ever references a specific
-stop by its own id; reasonable people model line-item-style things as entities too).
+## TimeMachine (optional)
 
-## Boundaries
+Historical data only. BinVentory stays the source of truth for what is true *now* —
+a bin's current telemetry, its open alert, when it was last cleaned all live on `Bin`.
+TimeMachine exists so the record of what *was* true doesn't overwhelm the core.
 
-This domain model intentionally does **not** cover route building / route
-optimization. That's a different kind of problem — time-series and geospatial data
-(driver positions over time, fill-rate trends) plus optimization algorithms, rather
-than transactional entity state — and is expected to live in its own component
-(e.g. `OpenKoqis.RoutingEngine`).
+That split is why the context is optional: history is the expensive part of the system,
+most of it never read, and an operator who doesn't want to pay for it can switch
+TimeMachine off and keep a fully working system.
 
-That component should:
+**`BinCleaning`****`BinCleaning`** — A fact: this bin was emptied at this time.
 
-- Consume a narrow, explicit data contract from this domain (bin id + coordinates +
-  fill level; driver id + current location + shift status) rather than referencing
-  `Bin` or `User` directly. The gRPC contract *is* that boundary — define it in terms
-  of stops, constraints, and routes, not domain entities.
-- Receive business constraints (max shift length, alert-priority weighting, location
-  eligibility) as explicit inputs, not hardcoded inside the solver. Those constraints
-  are domain rules even though the routing algorithm itself isn't.
-- Own its own storage suited to geospatial/time-series queries, independent of this
-  domain's persistence.
+**`BinHistory`** — The telemetry log: one `BinState` reading per entry. This is the
+high-volume table in the system, and the reason the context is separable — it is a
+natural candidate for a time-series store rather than the relational one.
 
-`Route` (below) still lives in the core domain, even though it originates from
-RoutingEngine's computation — it's a different kind of data than the live position
-feed. A `Route` is one row per build with a handful of stops; its volume scales with
-*(drivers × shifts × stops per shift)*, which is small. The "many drivers, many data"
-problem is the continuous position stream RoutingEngine uses to compute `ActualStops`
-— that stream never enters the domain. RoutingEngine reports discrete facts back
-("Route X, stop 3, arrived at 14:02"), it doesn't hand over its raw tracking data.
+**`Alert`** — Raised when a bin needs attention: `AlmostFull`, `Disconnected`,
+`SmokeDetected`, `LifeDetected`, `RealShitDetected`. Unlike the other two it has a
+lifecycle — it is resolved, at a time, by a user — which makes it the one aggregate
+here with an invariant worth protecting.
+
+## TruckBrain (core)
+
+**`RouteEngine`** — A black box. Its internal structure is deliberately undecided:
+route optimization is an algorithmic and geospatial problem, not a transactional one,
+and it is expected to own storage suited to that.
+
+What it must not do is reach into the other contexts. Its input is a set of
+`IRoutingDestination`s plus explicit business constraints (shift length, alert
+priority weighting, location eligibility) passed in as parameters. Its output is a
+`Route` — an ordered list of destinations. Constraints are domain rules even though
+the solver is not; they belong on the wire, not hardcoded in the algorithm.
+
+Live driver positions and the continuous tracking stream stay inside TruckBrain. The
+domain receives discrete facts back, never the raw feed.
 
 ## Open questions
 
-- **Alert lifecycle** — currently models only creation. No acknowledged/resolved state
-  yet; add if the UI needs to track whether someone has acted on an alert.
-- **LocationId on User / UserId on Shift** — both are "should be a Driver/Dispatcher"
-  or "should be a Driver/TechnicalSpecialist" constraints that live in business logic,
-  not in the type system. Worth a domain service or factory method that enforces it at
-  creation time rather than trusting every call site.
-- **BinPlacementRequest location** — currently a free-text description rather than a
-  `LocationId` reference. Worth deciding once you know whether placement requests
-  always map cleanly onto an existing `Location`.
-- **Route rebuilds** — when RoutingEngine rebuilds a route mid-shift, does the
-  superseded `Route` get marked `Abandoned`, or just sit there as one of several
-  routes for that shift with no explicit "this one's stale" marker?
-- **Geography as a one-class module** — fine for now, but if it stays just `Location`
-  forever, folding it into `Identity` (rename to something like `AccessAndGeography`)
-  might be more honest than a module that exists for symmetry alone.
+- **`Route` ownership** — `Route` is listed under TruckBrain, but it's the one
+  RouteEngine output the rest of the system needs to read (which truck goes where,
+  in what order). Decide whether it's a TruckBrain aggregate the core queries, or a
+  core aggregate TruckBrain writes into.
+
+- **Attribute rules have no representation yet** — `Access` is `(Resource, Actions)`
+  with no attributes, so it can express "drivers may read bins" but not "drivers may
+  read bins in their own location". Given `User.LocationId` exists, that second form
+  is likely wanted. Adding a scope or predicate to `Access` and filtering in query
+  handlers are different implementations, so this is worth settling before the
+  permission check is built.
+
+- **`BinGroup` and `Location`** — the canvas gives `BinGroup` a required
+  `LocationId`, but Geography is optional. Either that reference is nullable like
+  every other one, or `BinGroup` quietly depends on a context that can be turned off.
+
+- **Group-level operations** — a `BinCleaning` and an `Alert` both pin to a single
+  `Bin`. If a truck services a whole `BinGroup` as one stop, is that N cleanings or
+  one group cleaning?
+
+## Implementation status
+
+Markers: ⚪ planned · 🟡 partial, diverges from this document · 🟢 matches this document.
+
+| Context / Aggregate | Status | Notes                                           |
+|---------------------|--------|-------------------------------------------------|
+| Humans — `Identity` | ⚪      | Keycloak not integrated                         |
+| Humans — `Role`     | 🟡     | Exists as a `UserRole` enum, not `Access`-based |
+| Humans — `User`     | 🟡     | Stores its own credentials                      |
+| Geography           | ⚪      |                                                 |
+| BinVentory          | 🟡     | `Bin` exists; no `BinGroup`                     |
+| TimeMachine         | 🟡     | `Alert`, `CleaningLog` exist inside the core    |
+| TruckBrain          | ⚪      |                                                 |
+| Module separability | ⚪      | Contexts are not separable in `src/` yet        |
+
+`src/` also contains `ShiftLog`, which has no counterpart in this model — shifts were
+dropped from the target domain and the type is expected to go with the refactor.
