@@ -1,42 +1,21 @@
 namespace OpenKoqis.Domain.Shared;
 
-/// <summary>
-/// Base Value Object class. <see href="https://learn.microsoft.com/en-us/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/implement-value-objects">Docs from Microsoft</see>
-/// </summary>
 public abstract class ValueObject : IEquatable<ValueObject>
 {
-    protected static bool EqualOperator(ValueObject left, ValueObject right)
-    {
-        if (ReferenceEquals(left, null) ^ ReferenceEquals(right, null))
-        {
-            return false;
-        }
-
-        return ReferenceEquals(left, right) || (left?.Equals(right) ?? false);
-    }
-
-    protected static bool NotEqualOperator(ValueObject left, ValueObject right) => !EqualOperator(left, right);
-
     protected abstract IEnumerable<object> GetEqualityComponents();
 
-    public bool Equals(ValueObject? other)
-        => other is not null && GetEqualityComponents().SequenceEqual(other.GetEqualityComponents());
+    public override bool Equals(object? obj) =>
+        obj is not null && obj.GetType() == GetType() && Equals((ValueObject)obj);
 
-    public override bool Equals(object? obj)
-    {
-        if (obj == null || obj.GetType() != GetType())
-            return false;
+    public bool Equals(ValueObject? other) =>
+        other is not null && GetEqualityComponents().SequenceEqual(other.GetEqualityComponents());
 
-        return Equals((ValueObject)obj);
-    }
+    public override int GetHashCode() =>
+        GetEqualityComponents().Select(x => x?.GetHashCode() ?? 0).Aggregate((x, y) => x ^ y);
 
-    public override int GetHashCode()
-    {
-        return GetEqualityComponents()
-            .Select(x => x?.GetHashCode() ?? 0)
-            .Aggregate((x, y) => x ^ y);
-    }
+    public static bool operator ==(ValueObject? left, ValueObject? right) => EqualOperator(left, right);
+    public static bool operator !=(ValueObject? left, ValueObject? right) => !EqualOperator(left, right);
 
-    public static bool operator ==(ValueObject one, ValueObject two) => EqualOperator(one, two);
-    public static bool operator !=(ValueObject one, ValueObject two) => NotEqualOperator(one, two);
+    private static bool EqualOperator(ValueObject? left, ValueObject? right) =>
+        ReferenceEquals(left, right) || (left is not null && right is not null && left.Equals(right));
 }

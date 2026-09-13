@@ -26,17 +26,13 @@ public class LogBinCleaningCommandHandler(IMongoDatabase database, ILogger<LogBi
             return CleaningLogErrors.BinNotFound(request.BinId);
         }
 
-        var cleaning = new CleaningLog
-        {
-            BinId = ObjectId.Parse(request.BinId),
-            UserId = ObjectId.Parse(request.UserId),
-            StartedAt = DateTime.UtcNow,
-            FinishedAt = DateTime.UtcNow,
-            RemovedWeightKg = request.RemovedKg,
-            Notes = request.Notes ?? string.Empty,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
+        var cleaning = new CleaningLog(
+            ObjectId.GenerateNewId().ToString(),
+            request.BinId,
+            request.UserId,
+            request.RemovedKg,
+            request.Notes ?? string.Empty
+        );
 
         await _logCollection.InsertOneAsync(cleaning, cancellationToken: cancellationToken);
 

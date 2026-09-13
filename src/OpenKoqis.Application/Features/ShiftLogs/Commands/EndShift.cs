@@ -1,7 +1,6 @@
 using ErrorOr;
 using Mediator;
 using Microsoft.Extensions.Logging;
-using MongoDB.Bson;
 using MongoDB.Driver;
 using OpenKoqis.Application.Features.ShiftLogs.Errors;
 using OpenKoqis.Domain.Models;
@@ -31,16 +30,12 @@ public class EndShiftCommandHandler(IMongoDatabase database, ILogger<EndShiftCom
             return ShiftLogErrors.NotFound(request.ShiftId);
         }
 
-        var cleanedObjectIds = new List<ObjectId>();
-        var foundBinsCount = 0;
-
+        var validBinIds = new List<string>();
         foreach (var binId in request.CleanedBinIds)
         {
-            var binExists = await _binCollection.Find(b => b.Id == binId).AnyAsync(cancellationToken);
-            if (binExists)
+            if (await _binCollection.Find(b => b.Id == binId).AnyAsync(cancellationToken))
             {
-                cleanedObjectIds.Add(ObjectId.Parse(binId));
-                foundBinsCount++;
+                validBinIds.Add(binId);
             }
             else
             {
@@ -48,18 +43,21 @@ public class EndShiftCommandHandler(IMongoDatabase database, ILogger<EndShiftCom
             }
         }
 
+        var endedAtValue = request.EndedAt == default ? DateTime.UtcNow : request.EndedAt;
+        var routeValue = request.Route ?? shift.Route;
+
         var filter = Builders<ShiftLog>.Filter.Eq(s => s.Id, request.ShiftId);
         var update = Builders<ShiftLog>.Update
-            .Set(s => s.EndedAt, request.EndedAt == default ? DateTime.UtcNow : request.EndedAt)
-            .Set(s => s.CleanedBins, cleanedObjectIds)
+            .Set(s => s.EndedAt, (DateTime?)endedAtValue)
+            .Set(s => s.CleanedBins, validBinIds)
             .Set(s => s.DistanceTravelledKm, request.DistanceKm)
-            .Set(s => s.Route, request.Route ?? shift.Route)
+            .Set(s => s.Route, routeValue)
             .Set(s => s.UpdatedAt, DateTime.UtcNow);
 
         await _shiftCollection.UpdateOneAsync(filter, update, cancellationToken: cancellationToken);
 
         logger.LogInformation("Shift {ShiftId} ended successfully. Bins cleaned: {Count}. Distance: {Distance} km",
-            request.ShiftId, foundBinsCount, request.DistanceKm);
+            request.ShiftId, validBinIds.Count, request.DistanceKm);
 
         return Result.Success;
     }

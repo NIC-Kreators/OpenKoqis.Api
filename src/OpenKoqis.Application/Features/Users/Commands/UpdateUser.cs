@@ -7,7 +7,7 @@ using OpenKoqis.Domain.Models;
 
 namespace OpenKoqis.Application.Features.Users.Commands;
 
-public record UpdateUserCommand(string Id, User User) : IRequest<ErrorOr<Updated>>;
+public record UpdateUserCommand(string Id, User UpdatedUserData) : IRequest<ErrorOr<Updated>>;
 
 public class UpdateUserCommandHandler(IMongoDatabase database, ILogger<UpdateUserCommandHandler> logger) : IRequestHandler<UpdateUserCommand, ErrorOr<Updated>>
 {
@@ -24,11 +24,10 @@ public class UpdateUserCommandHandler(IMongoDatabase database, ILogger<UpdateUse
             return UserErrors.NotFound(request.Id);
         }
 
-        request.User.Id = existing.Id;
-        request.User.CreatedAt = existing.CreatedAt;
-        request.User.UpdatedAt = DateTime.UtcNow;
+        // Обновляем доменную модель по правилам инкапсуляции
+        existing.UpdateDetails(request.UpdatedUserData.FullName, request.UpdatedUserData.Role);
 
-        await _collection.ReplaceOneAsync(u => u.Id == request.Id, request.User, cancellationToken: cancellationToken);
+        await _collection.ReplaceOneAsync(u => u.Id == request.Id, existing, cancellationToken: cancellationToken);
         logger.LogInformation("User {UserId} successfully updated", request.Id);
 
         return Result.Updated;

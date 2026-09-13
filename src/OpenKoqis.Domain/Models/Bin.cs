@@ -1,50 +1,37 @@
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization.Attributes;
-
 namespace OpenKoqis.Domain.Models;
 
-public struct GeoPoint
+public class GeoPoint(double longitude, double latitude) : Shared.ValueObject
 {
-    [BsonElement("type")]
-    public string Type { get; set; } = "Point";
+    public double Longitude { get; } = longitude is >= -180 and <= 180 ? longitude : throw new ArgumentOutOfRangeException(nameof(longitude));
+    public double Latitude { get; } = latitude is >= -90 and <= 90 ? latitude : throw new ArgumentOutOfRangeException(nameof(latitude));
+    protected override IEnumerable<object> GetEqualityComponents() => [Longitude, Latitude];
+}
 
-    [BsonElement("coordinates")]
-    public double[] Coordinates { get; set; } // [longitude, latitude]
+public enum BinStatus { Active, Inactive, Maintenance }
+public enum BinType { Dumpster, CityBin }
 
-    public GeoPoint(double[] coordinates)
+public class Bin(string id, BinType type, GeoPoint location, BinStatus status) : Shared.Entity<string>(id)
+{
+    public BinType Type { get; } = type;
+    public GeoPoint Location { get; private set; } = location;
+    public BinTelemetry? Telemetry { get; private set; }
+    public List<BinTelemetry> TelemetryHistory { get; } = [];
+    public BinStatus Status { get; private set; } = status;
+
+    public void UpdateTelemetry(BinTelemetry telemetry)
     {
-        if (coordinates.Length != 2)
-            throw new ArgumentException("Coordinates must contain exactly two elements: [longitude, latitude].");
+        Telemetry = telemetry;
+        TelemetryHistory.Add(telemetry);
 
-        Coordinates = coordinates;
+        if (telemetry.IsSmokeDetected)
+            Status = BinStatus.Maintenance;
+
+        MarkModified();
     }
-}
 
-public enum BinStatus
-{
-    Active,
-    Inactive,
-    Maintenance,
-}
-
-public enum BinType
-{
-    Dumpster,
-    CityBin,
-}
-
-public class Bin : IEntity
-{
-    [BsonId]
-    [BsonRepresentation(BsonType.ObjectId)]
-    public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
-
-    public BinType Type { get; set; }
-    public GeoPoint Location { get; set; }
-    public required BinTelemetry Telemetry { get; set; }
-    public BinTelemetry[] TelemetryHistory { get; set; } = [];
-    public BinStatus Status { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-    public DateTime UpdatedAt { get; set; }
+    public void ChangeStatus(BinStatus status)
+    {
+        Status = status;
+        MarkModified();
+    }
 }
