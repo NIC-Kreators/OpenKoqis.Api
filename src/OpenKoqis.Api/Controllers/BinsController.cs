@@ -16,17 +16,11 @@ public class BinsController(ISender mediator) : ApiController
         [FromQuery] int? minFillLevel = null,
         CancellationToken cancellationToken = default) =>
         (await mediator.Send(new GetAllBinsQuery(), cancellationToken)).Match(
-            bins =>
-            {
-                if (status is { } s)
-                    bins = bins.Where(b => b.Status == s).ToList();
-                if (minFillLevel is { } m)
-                    bins = bins.Where(b => b.Telemetry?.FillLevel is { } fl && (int)fl >= m).ToList();
-                return Ok(bins);
-            },
-            Problem
-        );
-
+            bins => Ok(bins
+                .Where(bin => status is null || bin.Status == status)
+                .Where(bin => minFillLevel is null || (bin.Telemetry is { FillLevel.Value: var level } && level >= minFillLevel))
+                .ToList()),
+            Problem);
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetByIdAsync(string id, CancellationToken cancellationToken) =>
@@ -53,10 +47,10 @@ public class BinsController(ISender mediator) : ApiController
         if (telemetry.IsSmokeDetected)
             await mediator.Send(new CreateAlertCommand(id, AlertType.Smoke, AlertSeverity.Critical, "Danger! Smoke detected in the bin.", null), cancellationToken);
 
-        if (telemetry.FillLevel >= 90)
+        if (telemetry.FillLevel.Value >= 90)
         {
-            var severity = telemetry.FillLevel >= 100 ? AlertSeverity.Critical : AlertSeverity.Warning;
-            await mediator.Send(new CreateAlertCommand(id, AlertType.Fullness, severity, $"Container fill level at {telemetry.FillLevel}%", telemetry.FillLevel.ToString()), cancellationToken);
+            var severity = telemetry.FillLevel.Value >= 100 ? AlertSeverity.Critical : AlertSeverity.Warning;
+            await mediator.Send(new CreateAlertCommand(id, AlertType.Fullness, severity, $"Container fill level at {telemetry.FillLevel.Value}%", telemetry.FillLevel.Value.ToString()), cancellationToken);
         }
 
         return NoContent();
@@ -66,7 +60,7 @@ public class BinsController(ISender mediator) : ApiController
     public async Task<IActionResult> SeedBinsAsync(int count = 10, CancellationToken cancellationToken = default)
     {
         var telemetryFaker = new Faker<BinTelemetry>()
-            .RuleFor(t => t.FillLevel, f => FillLevel.Parse(f.Random.Int(0, 100)))
+            .RuleFor(t => t.FillLevel, f => FillLevel.Create(f.Random.Int(0, 100)).Value)
             .RuleFor(t => t.IsSmokeDetected, f => f.Random.Bool(0.05f))
             .RuleFor(t => t.IsOverloaded, f => f.Random.Bool(0.1f))
             .RuleFor(t => t.LastUpdated, f => f.Date.Recent(1));
@@ -80,14 +74,11 @@ public class BinsController(ISender mediator) : ApiController
             .RuleFor(b => b.CreatedAt, f => f.Date.Past(1));
 
         int successCount = 0;
-        foreach (var bin in binFaker.Generate(count))
+        foreach (var bin in binFaker.Generate(count).Where(b => b.Telemetry is not null))
         {
-            if (bin.Telemetry is not null)
-            {
-                var result = await mediator.Send(new CreateBinCommand(bin.Type, bin.Location, bin.Telemetry, bin.Status), cancellationToken);
-                if (!result.IsError)
-                    successCount++;
-            }
+            var result = await mediator.Send(new CreateBinCommand(bin.Type, bin.Location, bin.Telemetry!, bin.Status), cancellationToken);
+            if (!result.IsError)
+                successCount++;
         }
 
         return Ok(new { message = $"Successfully seeded {successCount} out of {count} bins in Almaty region" });

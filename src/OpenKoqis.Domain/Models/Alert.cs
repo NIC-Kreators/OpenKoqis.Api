@@ -1,15 +1,18 @@
+using OpenKoqis.Domain.Shared;
+
+
 namespace OpenKoqis.Domain.Models;
 
 public enum AlertSeverity { Info, Warning, Critical }
 public enum AlertType { Smoke, Overload, Fullness, ConnectionLost }
 
-public class Alert(string id, string binId, AlertType type, AlertSeverity severity, string message, string? valueAtTime = null) : Shared.Entity<string>(id)
+public record AlertDetails(AlertType Type, AlertSeverity Severity, string Message, string? ValueAtTime = null);
+
+// Fixed: ID is generated internally. Arguments are grouped into a record to avoid 3+ parameters. Inherits directly.
+public class Alert(string binId, AlertDetails details) : Entity<string>(Guid.NewGuid().ToString())
 {
     public string BinId { get; } = binId;
-    public AlertType Type { get; } = type;
-    public AlertSeverity Severity { get; } = severity;
-    public string Message { get; } = message;
-    public string? ValueAtTime { get; } = valueAtTime;
+    public AlertDetails Details { get; } = details;
     public bool IsResolved { get; private set; }
     public DateTime? ResolvedAt { get; private set; }
 
@@ -17,7 +20,6 @@ public class Alert(string id, string binId, AlertType type, AlertSeverity severi
     {
         if (IsResolved)
             return;
-
         IsResolved = true;
         ResolvedAt = DateTime.UtcNow;
         MarkModified();

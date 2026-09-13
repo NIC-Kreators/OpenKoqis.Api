@@ -1,6 +1,7 @@
 using ErrorOr;
 using Mediator;
 using Microsoft.Extensions.Logging;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using OpenKoqis.Application.Features.Users.Errors;
 using OpenKoqis.Application.Services;
@@ -18,26 +19,28 @@ public class RegisterUserCommandHandler(IMongoDatabase database, IJwtService jwt
     public async ValueTask<ErrorOr<TokenPair>> Handle(RegisterUserCommand request, CancellationToken cancellationToken)
     {
         var dto = request.RegistrationDto;
-        logger.LogInformation("Starting registration process for Nickname: {Nickname}", dto.Nickname);
 
-        var existingUser = await _collection.Find(u => u.Nickname.Value == dto.Nickname).FirstOrDefaultAsync(cancellationToken);
-        if (existingUser is not null)
-        {
-            logger.LogWarning("Registration failed. Nickname {Nickname} is already taken", dto.Nickname);
+        var usernameOrError = Username.Create(dto.Nickname);
+        if (usernameOrError.IsError)
+            return usernameOrError.Errors;
+
+        var fullNameOrError = FullName.Create(dto.FullName);
+        if (fullNameOrError.IsError)
+            return fullNameOrError.Errors;
+
+        if (await _collection.Find(u => u.Nickname.Value == dto.Nickname).AnyAsync(cancellationToken))
             return UserErrors.NicknameConflict(dto.Nickname);
-        }
 
-        var newUser = new User(
-            id: MongoDB.Bson.ObjectId.GenerateNewId().ToString(),
-            nickname: Username.Parse(dto.Nickname),
-            fullName: dto.FullName,
-            passwordHash: passwordHasher.HashPassword(dto.Password),
-            role: GuestRole.Instance
-        );
+        var user = new User(
+            ObjectId.GenerateNewId().ToString(),
+            usernameOrError.Value,
+            fullNameOrError.Value,
+            new PasswordHash(passwordHasher.HashPassword(dto.Password)),
+            GuestRole.Instance);
 
-        await _collection.InsertOneAsync(newUser, cancellationToken: cancellationToken);
-        logger.LogInformation("User {Nickname} registered and saved with ID: {UserId}", newUser.Nickname.Value, newUser.Id);
+        await _collection.InsertOneAsync(user, null, cancellationToken);
+        logger.LogInformation("User {Nickname} registered with ID: {UserId}", user.Nickname.Value, user.Id);
 
-        return await jwtService.GenerateTokenPairAsync(newUser.Id, newUser.Nickname.Value, newUser.Role);
+        return await jwtService.GenerateTokenPairAsync(user.Id, user.Nickname.Value, user.Role);
     }
 }

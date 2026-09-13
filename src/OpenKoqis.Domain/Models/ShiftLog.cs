@@ -1,6 +1,8 @@
+using OpenKoqis.Domain.Shared;
+
 namespace OpenKoqis.Domain.Models;
 
-public class ShiftLog(string id, string userId, string route) : Shared.Entity<string>(id)
+public class ShiftLog(string id, string userId, string route) : Entity<string>(id)
 {
     public string UserId { get; } = userId;
     public DateTime StartedAt { get; init; } = DateTime.UtcNow;

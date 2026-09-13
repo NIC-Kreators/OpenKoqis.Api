@@ -1,6 +1,8 @@
+using OpenKoqis.Domain.Shared;
+
 namespace OpenKoqis.Domain.Models;
 
-public class CleaningLog(string id, string binId, string userId, int removedWeightKg, string notes) : Shared.Entity<string>(id)
+public class CleaningLog(string id, string binId, string userId, int removedWeightKg, string notes) : Entity<string>(id)
 {
     public string BinId { get; } = binId;
     public string UserId { get; } = userId;
