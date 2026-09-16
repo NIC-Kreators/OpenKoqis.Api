@@ -27,22 +27,21 @@ see [domain-model.md](domain-model.md). This document is deliberately just the f
 ### `Latitude` (VO)
 
 A `struct` that implements the full numeric interface surface — the ones `Int32` and
-`Double` implement — so it is usable like a primitive while carrying its own bounds
-and its own arithmetic.
+`Double` implement — so it is usable like a primitive while carrying its own bounds and its own arithmetic.
 
-| Field         | Type     | Notes                                    |
-|---------------|----------|------------------------------------------|
-| `Value`       | `double` | Degrees, `-90` to `90`                   |
-| `Microdegrees`| `int`    | Backing value, `-900_000_000` to `900_000_000` |
+| Field          | Type     | Notes                                          |
+|----------------|----------|------------------------------------------------|
+| `Value`        | `double` | Degrees, `-90` to `90`                         |
+| `Microdegrees` | `int`    | Backing value, `-900_000_000` to `900_000_000` |
 
 ### `Longitude` (VO)
 
 Same shape as `Latitude`, with its own range and wrapping behaviour.
 
-| Field         | Type     | Notes                                        |
-|---------------|----------|----------------------------------------------|
-| `Value`       | `double` | Degrees, `-180` to `180`                     |
-| `Microdegrees`| `int`    | Backing value, `-1_800_000_000` to `1_800_000_000` |
+| Field          | Type     | Notes                                              |
+|----------------|----------|----------------------------------------------------|
+| `Value`        | `double` | Degrees, `-180` to `180`                           |
+| `Microdegrees` | `int`    | Backing value, `-1_800_000_000` to `1_800_000_000` |
 
 Arithmetic stays inside the valid range rather than overflowing:
 
@@ -66,9 +65,8 @@ Longitude total = l1 + l2; // -140
 |--------|----------|
 | `Name` | `string` |
 
-An opaque named thing that `Access` can be granted on. Shared owns the **type**; each
-module declares its own **instances**, because the module that owns `Bin` is the only
-one that should know `bin` exists:
+An opaque named thing that `Access` can be granted on. Shared owns the **type**; each module declares its own
+**instances**, because the module that owns `Bin` is the only one that should know `bin` exists:
 
 ```csharp
 // BinVentory
@@ -79,24 +77,22 @@ public static class BinVentoryResources
 }
 ```
 
-The dependency arrow only ever points into Shared. Humans never learns what a bin is,
-and BinVentory keeps control of what may be granted on the entities it owns.
+The dependency arrow only ever points into Shared. Humans never learns what a bin is, and BinVentory keeps control of
+what may be granted on the entities it owns.
 
 ### `IResourceCatalog`
 
-| Member | Type                     | Notes                      |
-|--------|--------------------------|----------------------------|
-| `All`  | `IReadOnlySet<Resource>` | Frozen after startup       |
+| Member | Type                     | Notes                |
+|--------|--------------------------|----------------------|
+| `All`  | `IReadOnlySet<Resource>` | Frozen after startup |
 
-The complete list of grantable resources, for building a role in the UI. Each module
-contributes its own catalog; they are aggregated at the composition root and frozen
-once.
+The complete list of grantable resources, for building a role in the UI. Each module contributes its own catalog; they
+are aggregated at the composition root and frozen once.
 
-Composed through DI rather than through a static registry populated by a private
-constructor. A static registry is only complete once every module's static class has
-happened to be touched, so the role-creation UI can observe a partial set depending on
-which endpoint ran first; it is also not thread-safe, and it leaks between parallel
-tests. Explicit registration at startup is deterministic on all three counts.
+Composed through DI rather than through a static registry populated by a private constructor. A static registry is only
+complete once every module's static class has happened to be touched, so the role-creation UI can observe a partial set
+depending on which endpoint ran first; it is also not thread-safe, and it leaks between parallel tests. Explicit
+registration at startup is deterministic on all three counts.
 
 ## Humans
 
@@ -111,22 +107,21 @@ tests. Explicit registration at startup is deterministic on all three counts.
 
 ### `Access` (VO)
 
-| Field      | Type                | Notes                                  |
-|------------|---------------------|----------------------------------------|
-| `Actions`  | `Flags Enum : byte` | `Read`, `Write`, `Edit`, `Delete`      |
-| `Resource` | `Resource`          | What the actions apply to              |
+| Field      | Type                | Notes                             |
+|------------|---------------------|-----------------------------------|
+| `Actions`  | `Flags Enum : byte` | `Read`, `Write`, `Edit`, `Delete` |
+| `Resource` | `Resource`          | What the actions apply to         |
 
 The unit of authorization. Everything else in this context exists to assign `Access`
 to a caller.
 
-Grant-only — there is no deny. Computing `User.Access` is therefore a **merge**, not a
-concatenation: entries for the same `Resource` collapse into one with their `Actions`
+Grant-only — there is no deny. Computing `User.Access` is therefore a **merge**, not a concatenation: entries for the
+same `Resource` collapse into one with their `Actions`
 flags OR-ed together.
 
-**RBAC and ABAC are both intended, and either can be used alone.** An operator can run
-OpenKoqis with roles only, with attribute rules only, or with both layered. Which of
-those the market actually wants is unknown, so the model deliberately keeps all three
-open rather than committing early.
+**RBAC and ABAC are both intended, and either can be used alone.** An operator can run OpenKoqis with roles only, with
+attribute rules only, or with both layered. Which of those the market actually wants is unknown, so the model
+deliberately keeps all three open rather than committing early.
 
 ### `Role`
 
@@ -138,23 +133,22 @@ open rather than committing early.
 
 ### `User`
 
-Authentication is delegated to **Keycloak**. The domain stores no credential of any
-kind — no password, no hash, no salt — so there is nothing here to verify against and
-nothing to leak.
+Authentication is delegated to **Keycloak**. The domain stores no credential of any kind — no password, no hash, no
+salt — so there is nothing here to verify against and nothing to leak.
 
-| Field             | Type        | Notes                                                        |
-|-------------------|-------------|--------------------------------------------------------------|
-| `Id`              | `Guid`      |                                                              |
-| `SubjectId`       | `string`    | The Keycloak subject this user maps to                       |
-| `Name`            | `HumanName` | Friendly display name                                        |
-| `RoleId`          | `Guid?`     | Moves to Keycloak if roles are managed there                 |
-| `DedicatedAccess` | `Access[]`  | Grants specific to this user                                 |
+| Field             | Type        | Notes                                                                  |
+|-------------------|-------------|------------------------------------------------------------------------|
+| `Id`              | `Guid`      |                                                                        |
+| `SubjectId`       | `string`    | The Keycloak subject this user maps to                                 |
+| `Name`            | `HumanName` | Friendly display name                                                  |
+| `RoleId`          | `Guid?`     | Moves to Keycloak if roles are managed there                           |
+| `DedicatedAccess` | `Access[]`  | Grants specific to this user                                           |
 | `Access`          | `Access[]`  | **Computed** — `Role.Access` merged with `DedicatedAccess`. Not stored |
-| `LocationId`      | `Guid?`     | → `Location`                                                 |
-| `IsRoot`          | `bool`      | Bypasses the access check entirely                           |
-| `CreatedAt`       | `DateTime`  |                                                              |
-| `UpdatedAt`       | `DateTime`  |                                                              |
-| `DeletedAt`       | `DateTime?` | Soft delete, 7-day retention                                 |
+| `LocationId`      | `Guid?`     | → `Location`                                                           |
+| `IsRoot`          | `bool`      | Bypasses the access check entirely                                     |
+| `CreatedAt`       | `DateTime`  |                                                                        |
+| `UpdatedAt`       | `DateTime`  |                                                                        |
+| `DeletedAt`       | `DateTime?` | Soft delete, 7-day retention                                           |
 
 ## Geography
 
@@ -179,22 +173,26 @@ nothing to leak.
 
 ### `BinTelemetry` (VO)
 
-| Field               | Type        | Notes |
-|---------------------|-------------|-------|
-| `FillLevel`         | `FillLevel` |       |
-| `GatheredAt`        | `DateTime`  |       |
-| `AdditionalComment` | `string?`   |       |
+Bin can not support some kind of metrics. Maybe it's better to make something like `BinSettings` VO.
+
+| Field               | Type           | Notes                                        |
+|---------------------|----------------|----------------------------------------------|
+| `FillLevel`         | `FillLevel?`   |                                              |
+| `Temperature`       | `Temperature?` | Maybe it's VO will have short with Unit enum |
+| `IsSmokeDetectorOn` | `bool?`        |                                              |
+| `GatheredAt`        | `DateTime`     |                                              |
+| `AdditionalComment` | `string?`      |                                              |
 
 ### `BinVolume` (VO)
 
-| Field   | Type    | Notes                    |
-|---------|---------|--------------------------|
-| `Liters`| `uint`  | Validated, max `99_999`  |
+| Field    | Type   | Notes                   |
+|----------|--------|-------------------------|
+| `Liters` | `uint` | Validated, max `99_999` |
 
 ### `Bin` : `IRoutingDestination`
 
-The source of truth for a bin's **current** state. Everything historical lives in
-TimeMachine — see that section for the split.
+The source of truth for a bin's **current** state. Everything historical lives in TimeMachine — see that section for the
+split.
 
 | Field              | Type            | Notes                                                   |
 |--------------------|-----------------|---------------------------------------------------------|
@@ -213,8 +211,8 @@ TimeMachine — see that section for the split.
 | `UpdatedAt`        | `DateTime`      |                                                         |
 | `DeletedAt`        | `DateTime?`     | Soft delete, 7-day retention                            |
 
-`WasteCategory` is not a priority. It describes roughly what the bin is shaped for,
-and `NotSpecified` is expected to be the common value for a long time.
+`WasteCategory` is not a priority. It describes roughly what the bin is shaped for, and `NotSpecified` is expected to be
+the common value for a long time.
 
 ### `BinGroup` : `IRoutingDestination`
 
@@ -227,8 +225,8 @@ and `NotSpecified` is expected to be the common value for a long time.
 
 ### `IRoutingDestination`
 
-The contract TruckBrain consumes. Implemented by both `Bin` and `BinGroup`, and the
-only thing the routing context knows about either of them.
+The contract TruckBrain consumes. Implemented by both `Bin` and `BinGroup`, and the only thing the routing context knows
+about either of them.
 
 | Member      | Type        |
 |-------------|-------------|
@@ -236,20 +234,18 @@ only thing the routing context knows about either of them.
 | `GeoPoint`  | `GeoPoint`  |
 | `FillLevel` | `FillLevel` |
 
-Which side owns this contract is undecided, and stays undecided until TruckBrain's
-internals are. If routing ends up behind a wire protocol, this is a message and the
-mapping belongs at the boundary rather than on the aggregate; if it stays in-process,
-the interface is fine where it is.
+Which side owns this contract is undecided, and stays undecided until TruckBrain's internals are. If routing ends up
+behind a wire protocol, this is a message and the mapping belongs at the boundary rather than on the aggregate; if it
+stays in-process, the interface is fine where it is.
 
 ## TimeMachine
 
-Historical data only. BinVentory remains the source of truth for what is true *now*;
-TimeMachine exists so that record of what *was* true doesn't overwhelm it.
+Historical data only. BinVentory remains the source of truth for what is true *now*; TimeMachine exists so that record
+of what *was* true doesn't overwhelm it.
 
-That split is also why the context is optional. History is the expensive part of the
-system — a row per bin per reading interval, most of it never read — and an operator
-who doesn't want to pay for it can switch TimeMachine off and keep a fully working
-system. BinVentory is core: without it OpenKoqis does not function at all.
+That split is also why the context is optional. History is the expensive part of the system — a row per bin per reading
+interval, most of it never read — and an operator who doesn't want to pay for it can switch TimeMachine off and keep a
+fully working system. BinVentory is core: without it OpenKoqis does not function at all.
 
 ### `BinHistory`
 
@@ -301,20 +297,20 @@ the open questions in
 
 Markers: ⚪ planned · 🟡 partial, diverges from this document · 🟢 matches this document.
 
-| Type                                  | Status | Notes                                       |
-|---------------------------------------|--------|---------------------------------------------|
-| `Latitude` / `Longitude` / `GeoPoint` | ⚪      | Coordinates are loose primitives            |
-| `Resource` / `IResourceCatalog`       | ⚪      |                                             |
-| `Access` / `Role`                     | 🟡     | Role enum, no resource-level grants         |
-| `HumanName`                           | ⚪      |                                             |
-| `User`                                | 🟡     | Holds credentials; no `SubjectId`           |
-| `Location`                            | ⚪      |                                             |
-| `FillLevel` / `BinTelemetry`          | 🟡     | Present, not modelled as value objects      |
-| `BinVolume`                           | ⚪      |                                             |
-| `Bin`                                 | 🟡     | Diverges in several fields                  |
-| `BinGroup`                            | ⚪      |                                             |
-| `IRoutingDestination`                 | ⚪      | Ownership undecided                         |
-| `BinHistory`                          | ⚪      |                                             |
-| `BinCleaning`                         | 🟡     | Exists as `CleaningLog`                     |
-| `Alert`                               | 🟡     | `IsResolved` bool; no `ResolvedAt`/`By`     |
-| `Route`                               | ⚪      | Shape undecided                             |
+| Type                                  | Status | Notes                                   |
+|---------------------------------------|--------|-----------------------------------------|
+| `Latitude` / `Longitude` / `GeoPoint` | ⚪     | Coordinates are loose primitives        |
+| `Resource` / `IResourceCatalog`       | ⚪     |                                         |
+| `Access` / `Role`                     | 🟡     | Role enum, no resource-level grants     |
+| `HumanName`                           | ⚪     |                                         |
+| `User`                                | 🟡     | Holds credentials; no `SubjectId`       |
+| `Location`                            | ⚪     |                                         |
+| `FillLevel` / `BinTelemetry`          | 🟡     | Present, not modelled as value objects  |
+| `BinVolume`                           | ⚪     |                                         |
+| `Bin`                                 | 🟡     | Diverges in several fields              |
+| `BinGroup`                            | ⚪     |                                         |
+| `IRoutingDestination`                 | ⚪     | Ownership undecided                     |
+| `BinHistory`                          | ⚪     |                                         |
+| `BinCleaning`                         | 🟡     | Exists as `CleaningLog`                 |
+| `Alert`                               | 🟡     | `IsResolved` bool; no `ResolvedAt`/`By` |
+| `Route`                               | ⚪     | Shape undecided                         |
