@@ -7,7 +7,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="ErrorOr" Version="2.1.1" />
+      <ProjectReference Include="..\..\..\Shared\OpenKoqis.Shared.Kernel\OpenKoqis.Shared.Kernel.csproj" />
     </ItemGroup>
 
 </Project>

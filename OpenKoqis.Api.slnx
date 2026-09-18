@@ -1,7 +1,9 @@
 <Solution>
   <Folder Name="/Host/" />
   <Folder Name="/Modules/" />
-  <Folder Name="/Modules/Humans/" />
+  <Folder Name="/Modules/Humans/">
+    <Project Path="src/Modules/Humans/OpenKoqis.Humans.Domain/OpenKoqis.Humans.Domain.csproj" />
+  </Folder>
   <Folder Name="/Shared/">
     <Project Path="src/Shared/OpenKoqis.Shared.Kernel/OpenKoqis.Shared.Kernel.csproj" />
   </Folder>
