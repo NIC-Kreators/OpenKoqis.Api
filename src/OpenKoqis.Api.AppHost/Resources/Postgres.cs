@@ -23,7 +23,7 @@ public static class Postgres
 
         var postgres = appBuilder
             .AddPostgres("openkoqis-postgres", userName: postgresUsername, password: postgresPassword)
-            .AddDatabase("openkoqis");
+            .AddDatabase("openkoqis-relational", databaseName: "openkoqis");
 
         return resourceBuilder.WithReference(postgres);
     }

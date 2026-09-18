@@ -29,7 +29,7 @@ public static class Mongo
             .WithEnvironment("GLIBC_TUNABLES", "glibc.pthread.rseq=1")
             .WithDataVolume()
             .WithLifetime(ContainerLifetime.Persistent)
-            .AddDatabase("openkoqis");
+            .AddDatabase("openkoqis-documents", databaseName: "openkoqis");
 
         return resourceBuilder.WithReference(mongo);
     }
