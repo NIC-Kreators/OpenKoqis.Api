@@ -15,8 +15,7 @@ public static class Mongo
     /// <typeparam name="TDestination">The destination resource.</typeparam>
     /// <returns>The <see cref="IResourceBuilder{T}"/> with MongoDB in chain.</returns>
     public static IResourceBuilder<TDestination> WithMongo<TDestination>(
-        this IResourceBuilder<TDestination> resourceBuilder,
-        IDistributedApplicationBuilder appBuilder)
+        this IResourceBuilder<TDestination> resourceBuilder, IDistributedApplicationBuilder appBuilder)
         where TDestination : IResourceWithEnvironment
     {
         var mongoUsername = appBuilder.AddParameter("mongo-username");
