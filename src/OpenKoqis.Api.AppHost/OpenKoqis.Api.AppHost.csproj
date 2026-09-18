@@ -1,4 +1,4 @@
-<Project Sdk="Aspire.AppHost.Sdk/13.5.3">
+<Project Sdk="Aspire.AppHost.Sdk/13.5.4">
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
@@ -7,7 +7,7 @@
         <Nullable>enable</Nullable>
         <UserSecretsId>24347b98-9f34-444b-b909-6c5418713470</UserSecretsId>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
-        <NoWarn>$(NoWarn);CS1591</NoWarn>
+        <NoWarn>$(NoWarn);CS1591;ASPIRE010</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
@@ -15,7 +15,9 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Aspire.Hosting.MongoDB" Version="13.5.3" />
+        <PackageReference Include="Aspire.Hosting.Keycloak" Version="13.5.4-preview.1.26464.4" />
+        <PackageReference Include="Aspire.Hosting.MongoDB" Version="13.5.4" />
+        <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.5.4" />
     </ItemGroup>
 
 </Project>
