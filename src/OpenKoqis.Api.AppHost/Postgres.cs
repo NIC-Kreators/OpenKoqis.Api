@@ -21,7 +21,7 @@ public static class Postgres
         var postgresPassword = appBuilder.AddParameter("postgres-password", secret: true);
 
         var postgres = appBuilder
-            .AddPostgres("postgres", userName: postgresUsername, password: postgresPassword)
+            .AddPostgres("openkoqis-postgres", userName: postgresUsername, password: postgresPassword)
             .AddDatabase("openkoqis");
 
         return resourceBuilder.WithReference(postgres);
