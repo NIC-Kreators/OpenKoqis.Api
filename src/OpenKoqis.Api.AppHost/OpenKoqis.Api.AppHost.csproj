@@ -7,7 +7,7 @@
         <Nullable>enable</Nullable>
         <UserSecretsId>24347b98-9f34-444b-b909-6c5418713470</UserSecretsId>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
-        <NoWarn>$(NoWarn);CS1591</NoWarn>
+        <NoWarn>$(NoWarn);CS1591;ASPIRE010</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
