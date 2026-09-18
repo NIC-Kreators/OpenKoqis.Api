@@ -1,4 +1,4 @@
-namespace OpenKoqis.Api.AppHost;
+namespace OpenKoqis.Api.AppHost.Resources;
 
 public static class Mqtt
 {
@@ -13,7 +13,8 @@ public static class Mqtt
     /// <typeparam name="TDestination">The destination resource.</typeparam>
     /// <returns>The <see cref="IResourceBuilder{T}"/> with MQTT in chain.</returns>
     public static IResourceBuilder<TDestination> WithMqtt<TDestination>(
-        this IResourceBuilder<TDestination> resourceBuilder, IDistributedApplicationBuilder appBuilder)
+        this IResourceBuilder<TDestination> resourceBuilder,
+        IDistributedApplicationBuilder appBuilder)
         where TDestination : IResourceWithEnvironment
     {
         var mosquittoConfigsRoot = $"{appBuilder.Environment.ContentRootPath}/config/mosquitto";

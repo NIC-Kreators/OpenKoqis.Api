@@ -1,4 +1,4 @@
-namespace OpenKoqis.Api.AppHost;
+namespace OpenKoqis.Api.AppHost.Resources;
 
 public static class Postgres
 {
@@ -14,7 +14,8 @@ public static class Postgres
     /// <typeparam name="TDestination">The destination resource.</typeparam>
     /// <returns>The <see cref="IResourceBuilder{T}"/> with PostgreSQL in chain.</returns>
     public static IResourceBuilder<TDestination> WithPostgres<TDestination>(
-        this IResourceBuilder<TDestination> resourceBuilder, IDistributedApplicationBuilder appBuilder)
+        this IResourceBuilder<TDestination> resourceBuilder,
+        IDistributedApplicationBuilder appBuilder)
         where TDestination : IResourceWithEnvironment
     {
         var postgresUsername = appBuilder.AddParameter("postgres-username");

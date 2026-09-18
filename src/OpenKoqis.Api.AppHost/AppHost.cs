@@ -1,4 +1,4 @@
-using OpenKoqis.Api.AppHost;
+using OpenKoqis.Api.AppHost.Resources;
 
 var builder = DistributedApplication.CreateBuilder(args);
 

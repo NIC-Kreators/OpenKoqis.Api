@@ -1,4 +1,4 @@
-namespace OpenKoqis.Api.AppHost;
+namespace OpenKoqis.Api.AppHost.Resources;
 
 public static class Keycloak
 {
