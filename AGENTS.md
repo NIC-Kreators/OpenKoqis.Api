@@ -102,7 +102,7 @@ public class GetBinByIdQueryHandler(IMongoDatabase database, ILogger<...> logger
 
     public async ValueTask<ErrorOr<Bin>> Handle(GetBinByIdQuery request, CancellationToken ct)
         => await _collection.Find(b => b.Id == request.Id).FirstOrDefaultAsync(ct)
-           ?? (ErrorOr<Bin>)BinErrors.NotFound(request.Id);
+           ?? BinErrors.NotFound(request.Id);
 }
 ```
 

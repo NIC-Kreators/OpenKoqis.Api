@@ -26,7 +26,7 @@ see [domain-model.md](domain-model.md). This document is deliberately just the f
 
 ### `Latitude` (VO)
 
-A `struct` that implements the full numeric interface surface — the ones `Int32` and
+A ` readonly record struct` that implements the full numeric interface surface — the ones `Int32` and
 `Double` implement — so it is usable like a primitive while carrying its own bounds and its own arithmetic.
 
 | Field          | Type     | Notes                                          |
