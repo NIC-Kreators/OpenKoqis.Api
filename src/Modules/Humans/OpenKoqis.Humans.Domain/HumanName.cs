@@ -8,16 +8,13 @@ namespace OpenKoqis.Humans.Domain;
 [DebuggerDisplay("{FullName}")]
 public class HumanName : ValueObject
 {
-    public string FirstName { get; }
-    public string? LastName { get; private init; }
-    public string? MiddleName { get; private init; }
+    public required string FirstName { get; init; }
+    public string? LastName { get; init; }
+    public string? MiddleName { get; init; }
 
     public string FullName => $"{FirstName} {LastName} {MiddleName}".Trim();
 
-    private HumanName(string firstName)
-    {
-        FirstName = firstName;
-    }
+    private HumanName() { }
 
     public static ErrorOr<HumanName> Parse(string raw)
     {
@@ -39,8 +36,9 @@ public class HumanName : ValueObject
             words[i] = finalWord.Value;
         }
 
-        return new HumanName(words[0])
+        return new HumanName()
         {
+            FirstName = words[0],
             LastName = words.Length >= 2 ? words[1] : null,
             MiddleName = words.Length >= 3 ? words[2] : null,
         };
