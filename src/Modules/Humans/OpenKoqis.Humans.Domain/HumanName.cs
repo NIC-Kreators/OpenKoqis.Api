@@ -2,6 +2,7 @@ using System.Diagnostics;
 using ErrorOr;
 using OpenKoqis.Humans.Domain.Errors;
 using OpenKoqis.Shared.Kernel;
+using OpenKoqis.Shared.Kernel.Rules;
 
 namespace OpenKoqis.Humans.Domain;
 
@@ -28,30 +29,20 @@ public class HumanName : ValueObject
 
         foreach (var (i, word) in words.Index())
         {
-            var finalWord = CheckWord(word);
+            var trimmed = word.Trim();
 
-            if (finalWord.IsError)
-                return finalWord.Errors;
+            if (NameRules.IsValid(trimmed))
+                return HumanNameErrors.AllSymbolsShouldBeALetter;
 
-            words[i] = finalWord.Value;
+            words[i] = trimmed;
         }
 
-        return new HumanName()
+        return new HumanName
         {
             FirstName = words[0],
             LastName = words.Length >= 2 ? words[1] : null,
             MiddleName = words.Length >= 3 ? words[2] : null,
         };
-    }
-
-    private static ErrorOr<string> CheckWord(string word)
-    {
-        word = word.Trim();
-
-        if (word.All(char.IsLetter) && word.Length is > 1 and < 16)
-            return word;
-
-        return HumanNameErrors.AllSymbolsShouldBeALetter;
     }
 
     protected override IEnumerable<object> GetEqualityComponents() => [FullName];

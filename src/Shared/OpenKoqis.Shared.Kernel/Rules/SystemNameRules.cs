@@ -2,9 +2,9 @@ namespace OpenKoqis.Shared.Kernel.Rules;
 
 public static class SystemNameRules
 {
-    public static bool IsValid(ReadOnlySpan<char> name, int maxLength = 16)
+    public static bool IsValid(ReadOnlySpan<char> name, ushort maxLength = 16)
     {
-        if (name.Length is < 1 || name.Length > maxLength)
+        if (name.Length < 1 || name.Length > maxLength)
             return false;
         if (!char.IsAsciiLetterLower(name[0]) || name[^1] == '-')
             return false;
