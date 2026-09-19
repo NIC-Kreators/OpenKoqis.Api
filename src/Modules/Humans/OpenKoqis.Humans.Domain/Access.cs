@@ -1,33 +1,68 @@
+using System.Diagnostics;
 using ErrorOr;
+using OpenKoqis.Humans.Domain.Errors;
 using OpenKoqis.Shared.Kernel;
+using OpenKoqis.Shared.Kernel.Rules;
 
 namespace OpenKoqis.Humans.Domain;
 
+[DebuggerDisplay("{FriendlyName}")]
 public class Access : ValueObject
 {
-    public required Action Actions { get; init; }
+    /// <summary>
+    /// Property created specially for <see cref="DebuggerDisplayAttribute"/>.
+    /// </summary>
+    private string FriendlyName => $"{Resource}:{string.Join(',', Permissions)}";
+
     public required string Resource { get; init; }
+    public required IReadOnlySet<string> Permissions { get; init; }
 
     private Access() { }
 
-    public static ErrorOr<Access> Parse(byte actions, string resource)
+    public static ErrorOr<Access> Parse(string raw)
     {
-        if (!Enum.IsDefined(typeof(Action), actions))
-            return Error.Validation(
-                code: "Access.InvalidActionValue",
-                description: "Action cannot exceed 4 bits, as it has only 4 values");
+        var resourceAndPermissions = raw.Split(':');
 
-        if (resource.Length is < 1 or > 32)
-            return Error.Validation(
-                code: "Access.InvalidResourceLength",
-                description: "Resource length can be between 1 and 32 symbols");
+        if (resourceAndPermissions.Length != 2)
+            return AccessErrors.InvalidAccessString(raw);
+
+        var resource = resourceAndPermissions[0];
+        var permissions = resourceAndPermissions[1].Split(',');
+
+        if (string.IsNullOrWhiteSpace(resource) || permissions.Any(string.IsNullOrWhiteSpace))
+            return AccessErrors.InvalidAccessString(raw);
+
+        return Parse(resource, permissions);
+    }
+
+    public static ErrorOr<Access> Parse(string resource, IEnumerable<string> permissions)
+    {
+        var trimmed = resource.ToLowerInvariant().Trim();
+
+        IReadOnlySet<string> permissionSet = permissions
+            .Select(p => p.ToLowerInvariant().Trim())
+            .ToHashSet();
+
+        if (!permissionSet.All(p => SystemNameRules.IsValid(p)))
+            return AccessErrors.InvalidPermission(string.Join(", ", permissionSet));
+
+        if (!SystemNameRules.IsValid(trimmed, maxLength: 32))
+            return AccessErrors.InvalidResource(trimmed);
 
         return new Access
         {
-            Actions = (Action)actions,
-            Resource = resource
+            Resource = trimmed,
+            Permissions = permissionSet,
         };
     }
 
-    protected override IEnumerable<object> GetEqualityComponents() => [Actions, Resource];
+    protected override IEnumerable<object> GetEqualityComponents()
+    {
+        yield return Resource;
+
+        var sortedPermissions = Permissions.OrderBy(p => p);
+
+        foreach (var permission in sortedPermissions)
+            yield return permission;
+    }
 }

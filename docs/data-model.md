@@ -61,9 +61,10 @@ Longitude total = l1 + l2; // -140
 
 ### `Resource` (VO)
 
-| Field  | Type     |
-|--------|----------|
-| `Name` | `string` |
+| Field                | Type                   |
+|----------------------|------------------------|
+| `Name`               | `string`               |
+| `AllowedPermissions` | `IReadOnlySet<stirng>` |
 
 An opaque named thing that `Access` can be granted on. Shared owns the **type**; each module declares its own
 **instances**, because the module that owns `Bin` is the only one that should know `bin` exists:
@@ -72,9 +73,18 @@ An opaque named thing that `Access` can be granted on. Shared owns the **type**;
 // BinVentory
 public static class BinVentoryResources
 {
-    public static readonly Resource Bin      = new("bin");
-    public static readonly Resource BinGroup = new("bin-group");
+    public static readonly Resource Bin = new("bin"); // CommonPermissions.All by default
+    public static readonly Resource BinGroup = new("bin-group", CommonPermissions.All);
+    public static readonly Resource BinInstall = new("bin-install", ["create", "approve", "reject"]);
 }
+
+// Injects into the DI
+public class BinVentoryResourceCatalog : IResourceCatalog
+{
+    public string ModuleName => "BinVentory";
+    public IReadOnlySet<Resource> All = FrozenSet.Create(Bin, BinGroup, BinInstall);
+}
+
 ```
 
 The dependency arrow only ever points into Shared. Humans never learns what a bin is, and BinVentory keeps control of
@@ -82,9 +92,10 @@ what may be granted on the entities it owns.
 
 ### `IResourceCatalog`
 
-| Member | Type                     | Notes                |
-|--------|--------------------------|----------------------|
-| `All`  | `IReadOnlySet<Resource>` | Frozen after startup |
+| Member       | Type                     | Notes                |
+|--------------|--------------------------|----------------------|
+| `ModuleName` | `string`                 |                      |
+| `All`        | `IReadOnlySet<Resource>` | Frozen after startup |
 
 The complete list of grantable resources, for building a role in the UI. Each module contributes its own catalog; they
 are aggregated at the composition root and frozen once.
@@ -107,10 +118,10 @@ registration at startup is deterministic on all three counts.
 
 ### `Access` (VO)
 
-| Field      | Type                | Notes                             |
-|------------|---------------------|-----------------------------------|
-| `Actions`  | `Flags Enum : byte` | `Read`, `Write`, `Edit`, `Delete` |
-| `Resource` | `Resource`          | What the actions apply to         |
+| Field         | Type                   | Notes |
+|---------------|------------------------|-------|
+| `Resource`    | `string`               |       |
+| `Permissions` | `IReadOnlySet<string>` |       |
 
 The unit of authorization. Everything else in this context exists to assign `Access`
 to a caller.
