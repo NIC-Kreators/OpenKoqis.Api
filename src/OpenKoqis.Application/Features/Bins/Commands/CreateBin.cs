@@ -1,6 +1,7 @@
 using ErrorOr;
 using Mediator;
 using Microsoft.Extensions.Logging;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using OpenKoqis.Domain.Models;
 
@@ -14,20 +15,13 @@ public class CreateBinCommandHandler(IMongoDatabase database, ILogger<CreateBinC
 
     public async ValueTask<ErrorOr<Bin>> Handle(CreateBinCommand request, CancellationToken cancellationToken)
     {
-        logger.LogInformation("Creating a new bin of type {BinType}", request.Type);
+        logger.LogInformation("Creating new bin of type {BinType}", request.Type);
 
-        var bin = new Bin
-        {
-            Type = request.Type,
-            Location = request.Location,
-            Telemetry = request.Telemetry,
-            Status = request.Status,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
+        var bin = new Bin(ObjectId.GenerateNewId().ToString(), request.Type, request.Location, request.Status);
+        bin.UpdateTelemetry(request.Telemetry);
 
         await _collection.InsertOneAsync(bin, cancellationToken: cancellationToken);
-        logger.LogInformation("Bin created successfully with ID: {BinId}", bin.Id);
+        logger.LogInformation("Bin {BinId} created successfully", bin.Id);
 
         return bin;
     }

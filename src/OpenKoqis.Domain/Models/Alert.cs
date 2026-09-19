@@ -1,44 +1,27 @@
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization.Attributes;
+using OpenKoqis.Domain.Shared;
+
 
 namespace OpenKoqis.Domain.Models;
 
-public enum AlertSeverity
+public enum AlertSeverity { Info, Warning, Critical }
+public enum AlertType { Smoke, Overload, Fullness, ConnectionLost }
+
+public record AlertDetails(AlertType Type, AlertSeverity Severity, string Message, string? ValueAtTime = null);
+
+// Fixed: ID is generated internally. Arguments are grouped into a record to avoid 3+ parameters. Inherits directly.
+public class Alert(string binId, AlertDetails details) : Entity<string>(Guid.NewGuid().ToString())
 {
-    Info,
-    Warning,
-    Critical
-}
+    public string BinId { get; } = binId;
+    public AlertDetails Details { get; } = details;
+    public bool IsResolved { get; private set; }
+    public DateTime? ResolvedAt { get; private set; }
 
-public enum AlertType
-{
-    Smoke,
-    Overload,
-    Fullness,
-    ConnectionLost
-}
-
-public class Alert : IEntity
-{
-    [BsonId]
-    [BsonRepresentation(BsonType.ObjectId)]
-    public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
-
-    public string BinId { get; set; } = null!;
-
-    public AlertType Type { get; set; }
-
-    public AlertSeverity Severity { get; set; }
-
-    public string Message { get; set; } = null!; // Message description
-
-    public string? ValueAtTime { get; set; } // Detector value when anomaly occured
-
-
-    public bool IsResolved { get; set; } = false;
-
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; }
-
-    public DateTime? ResolvedAt { get; set; }
+    public void Resolve()
+    {
+        if (IsResolved)
+            return;
+        IsResolved = true;
+        ResolvedAt = DateTime.UtcNow;
+        MarkModified();
+    }
 }

@@ -19,8 +19,7 @@ public class StartShiftCommandHandler(IMongoDatabase database, ILogger<StartShif
     {
         logger.LogInformation("Attempting to start a new shift for User: {UserId}", request.UserId);
 
-        var userFilter = Builders<BsonDocument>.Filter.Eq("_id", ObjectId.Parse(request.UserId));
-        var userExists = await _userCollection.Find(userFilter).AnyAsync(cancellationToken);
+        var userExists = await _userCollection.Find(Builders<BsonDocument>.Filter.Eq("_id", ObjectId.Parse(request.UserId))).AnyAsync(cancellationToken);
 
         if (!userExists)
         {
@@ -28,17 +27,7 @@ public class StartShiftCommandHandler(IMongoDatabase database, ILogger<StartShif
             return ShiftLogErrors.UserNotFound(request.UserId);
         }
 
-        var shift = new ShiftLog
-        {
-            UserId = ObjectId.Parse(request.UserId),
-            StartedAt = DateTime.UtcNow,
-            EndedAt = DateTime.MinValue,
-            CleanedBins = [],
-            DistanceTravelledKm = 0,
-            Route = string.Empty,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
+        var shift = new ShiftLog(ObjectId.GenerateNewId().ToString(), request.UserId, string.Empty);
 
         await _shiftCollection.InsertOneAsync(shift, cancellationToken: cancellationToken);
         logger.LogInformation("New shift started and saved. ShiftId: {ShiftId} for User: {UserId}", shift.Id, request.UserId);

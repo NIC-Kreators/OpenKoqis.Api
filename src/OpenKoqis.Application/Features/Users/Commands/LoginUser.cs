@@ -16,22 +16,11 @@ public class LoginUserCommandHandler(IMongoDatabase database, IJwtService jwtSer
 
     public async ValueTask<ErrorOr<TokenPair>> Handle(LoginUserCommand request, CancellationToken cancellationToken)
     {
-        logger.LogInformation("Login attempt for Nickname: {Nickname}", request.Nickname);
-
-        var user = await _collection.Find(u => u.Nickname == request.Nickname).FirstOrDefaultAsync(cancellationToken);
-        if (user is null)
-        {
-            logger.LogWarning("Login failed. User {Nickname} not found", request.Nickname);
+        if (await _collection.Find(u => u.Nickname.Value == request.Nickname).FirstOrDefaultAsync(cancellationToken) is not { } user ||
+            !passwordHasher.VerifyPassword(request.Password, user.PasswordHash.Value))
             return UserErrors.InvalidCredentials;
-        }
-
-        if (!passwordHasher.VerifyPassword(request.Password, user.PasswordHash))
-        {
-            logger.LogWarning("Login failed. Incorrect password for user {Nickname}", request.Nickname);
-            return UserErrors.InvalidCredentials;
-        }
 
         logger.LogInformation("User {Nickname} logged in successfully", request.Nickname);
-        return await jwtService.GenerateTokenPairAsync(user.Id, user.Nickname, user.Role);
+        return await jwtService.GenerateTokenPairAsync(user.Id, user.Nickname.Value, user.Role);
     }
 }

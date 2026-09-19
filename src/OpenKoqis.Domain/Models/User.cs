@@ -1,21 +1,34 @@
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization.Attributes;
+using OpenKoqis.Domain.Shared;
 
 namespace OpenKoqis.Domain.Models;
 
-public class User : IEntity
+public class User(string id, Username nickname, FullName fullName, PasswordHash passwordHash, UserRole role) : Entity<string>(id)
 {
-    [BsonId]
-    [BsonRepresentation(BsonType.ObjectId)]
-    public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
-    public UserRole Role { get; set; } = GuestRole.Instance;
-    public required string Nickname { get; init; }
-    public required string FullName { get; set; }
-    public required string PasswordHash { get; set; }
+    public Username Nickname { get; } = nickname;
+    public FullName FullName { get; private set; } = fullName;
+    public PasswordHash PasswordHash { get; private set; } = passwordHash;
+    public UserRole Role { get; private set; } = role;
+    public bool PasswordRecreationRequired { get; private set; }
+    public DateTime PasswordLastChangedAt { get; private set; } = DateTime.UtcNow;
 
-    public bool PasswordRecreationRequired { get; set; } = false;
-    public DateTime PasswordLastChangedAt { get; set; }
+    public void UpdateDetails(FullName fullName, UserRole role)
+    {
+        FullName = fullName;
+        Role = role;
+        MarkModified();
+    }
 
-    public DateTime CreatedAt { get; set; }
-    public DateTime UpdatedAt { get; set; }
+    public void ChangePassword(PasswordHash newPasswordHash)
+    {
+        PasswordHash = newPasswordHash;
+        PasswordRecreationRequired = false;
+        PasswordLastChangedAt = DateTime.UtcNow;
+        MarkModified();
+    }
+
+    public void RequirePasswordRecreation()
+    {
+        PasswordRecreationRequired = true;
+        MarkModified();
+    }
 }
