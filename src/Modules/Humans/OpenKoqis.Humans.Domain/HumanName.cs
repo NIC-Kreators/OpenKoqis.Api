@@ -32,15 +32,12 @@ public class HumanName : ValueObject
         if (string.IsNullOrWhiteSpace(raw))
             return HumanNameErrors.WrongAmountOfWords(0);
 
-        var words = raw.Split(' ');
+        var words = raw.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         List<Error> errors = [];
 
         if (words.Length is < 1 or > 3)
             errors.Add(HumanNameErrors.WrongAmountOfWords(words.Length));
-
-        foreach (var (i, word) in words.Index())
-            words[i] = word.Trim();
 
         if (words.Any(w => !NameRules.IsValid(w)))
             errors.Add(HumanNameErrors.AllSymbolsShouldBeALetter);

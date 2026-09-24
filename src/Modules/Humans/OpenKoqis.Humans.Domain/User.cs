@@ -54,7 +54,7 @@ public class User : Entity<Guid>
     /// <summary>
     /// User's contact Phone Number. Can be used for signing in as well.
     /// </summary>
-    public PhoneNumber? PhoneNumber { get; set; }
+    public PhoneNumber? PhoneNumber { get; init; }
 
     /// <summary>
     /// Id of the user in the external identity provider.
