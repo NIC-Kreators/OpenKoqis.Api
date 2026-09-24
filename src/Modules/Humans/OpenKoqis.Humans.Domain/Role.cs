@@ -25,7 +25,7 @@ public class Role : Entity<Guid>
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; private set; } = DateTime.UtcNow;
 
-    private Role(Guid id) : base(id) { }
+    private Role() : base(Guid.CreateVersion7()) { }
 
     public static ErrorOr<Role> Create(CreationAttributes attributes)
     {
@@ -42,7 +42,7 @@ public class Role : Entity<Guid>
         if (accessSet.Count == 0)
             return RoleErrors.AtLeastOneAccessShouldBeDefined;
 
-        return new Role(Guid.CreateVersion7())
+        return new Role
         {
             Name = trimmed,
             CreatedBy = attributes.CreatedBy,

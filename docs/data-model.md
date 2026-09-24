@@ -150,11 +150,10 @@ salt — so there is nothing here to verify against and nothing to leak.
 | Field             | Type        | Notes                                                                  |
 |-------------------|-------------|------------------------------------------------------------------------|
 | `Id`              | `Guid`      |                                                                        |
-| `SubjectId`       | `string`    | The Keycloak subject this user maps to                                 |
+| `IdentityId`      | `string`    | The Keycloak subject this user maps to                                 |
 | `Name`            | `HumanName` | Friendly display name                                                  |
 | `RoleId`          | `Guid?`     | Moves to Keycloak if roles are managed there                           |
 | `DedicatedAccess` | `Access[]`  | Grants specific to this user                                           |
-| `Access`          | `Access[]`  | **Computed** — `Role.Access` merged with `DedicatedAccess`. Not stored |
 | `LocationId`      | `Guid?`     | → `Location`                                                           |
 | `IsRoot`          | `bool`      | Bypasses the access check entirely                                     |
 | `CreatedAt`       | `DateTime`  |                                                                        |
