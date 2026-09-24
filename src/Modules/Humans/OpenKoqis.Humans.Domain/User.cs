@@ -8,15 +8,23 @@ public class User : Entity<Guid>
 {
     public record CreationAttributes
     {
+        public required Login Login { get; init; }
         public required string IdentityId { get; init; }
         public required HumanName Name { get; init; }
         public Guid? RoleId { get; init; }
         public IEnumerable<Access> DedicatedAccess { get; init; } = [];
+
+        public Email? Email { get; init; }
+        public PhoneNumber? PhoneNumber { get; init; }
     }
 
     private static readonly Lock _rootAdminCreationLock = new();
 
     private HashSet<Access> _dedicatedAccess = [];
+
+    public required Login Login { get; init; }
+    public Email? Email { get; init; }
+    public PhoneNumber? PhoneNumber { get; set; }
 
     public required string IdentityId { get; init; }
     public HumanName Name { get; private set; } = null!;
@@ -48,6 +56,16 @@ public class User : Entity<Guid>
 
         List<Error> errors = [];
 
+        var login = attributes.Login;
+        var email = attributes.Email;
+        var phoneNumber = attributes.PhoneNumber;
+
+        if (login is Email loginEmail)
+            email ??= loginEmail;
+
+        if (login is PhoneNumber loginPhoneNumber)
+            phoneNumber ??= loginPhoneNumber;
+
         if (trimmedIdentityId.Length is < 1 or > 2048)
             errors.Add(UserErrors.InvalidIdentityId);
 
@@ -64,6 +82,9 @@ public class User : Entity<Guid>
 
         return new User
         {
+            Login = attributes.Login,
+            Email = email,
+            PhoneNumber = phoneNumber,
             IdentityId = trimmedIdentityId,
             Name = attributes.Name,
             RoleId = attributes.RoleId,
