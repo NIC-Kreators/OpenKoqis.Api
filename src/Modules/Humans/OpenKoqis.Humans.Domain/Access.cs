@@ -56,6 +56,16 @@ public class Access : ValueObject
         };
     }
 
+    public static IReadOnlySet<Access> Merge(IEnumerable<Access> accesses) =>
+        accesses
+            .GroupBy(a => a.Resource)
+            .Select(g => new Access
+            {
+                Resource = g.Key,
+                Permissions = g.SelectMany(a => a.Permissions).ToHashSet(),
+            })
+            .ToHashSet();
+
     protected override IEnumerable<object> GetEqualityComponents()
     {
         yield return Resource;

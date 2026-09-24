@@ -64,4 +64,20 @@ public class User : Entity<Guid>
             IsRoot = isRoot
         };
     }
+
+    public ErrorOr<IReadOnlySet<Access>> ResolveFullAccess(Role? currentRole)
+    {
+        if (currentRole?.Id != RoleId)
+            return Error.Failure(
+                code: "User.RoleMismatch",
+                description: $"Role assigned to the user {RoleId} doesn't match the requested role {currentRole?.Id.ToString() ?? "-"}");
+
+        if (currentRole is null && !RoleId.HasValue)
+            return [];
+
+        var allPossibleAccess = _dedicatedAccess
+            .Concat(currentRole?.Accesses ?? (IEnumerable<Access>)[]);
+
+        return Access.Merge(allPossibleAccess).ToErrorOr();
+    }
 }
