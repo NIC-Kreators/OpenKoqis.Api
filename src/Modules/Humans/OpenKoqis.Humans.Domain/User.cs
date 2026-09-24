@@ -72,6 +72,46 @@ public class User : Entity<Guid>
         };
     }
 
+    public ErrorOr<Updated> Rename(HumanName name)
+    {
+        Name = name;
+        UpdatedAt = DateTime.UtcNow;
+
+        return Result.Updated;
+    }
+
+    /// <summary>
+    /// Assigns <paramref name="newRole"/> (or clears the role when <c>null</c>)
+    /// and returns the user's full access afterwards.
+    /// </summary>
+    public ErrorOr<IReadOnlySet<Access>> UpdateRole(Role? newRole)
+    {
+        RoleId = newRole?.Id;
+        UpdatedAt = DateTime.UtcNow;
+
+        return ResolveFullAccess(newRole);
+    }
+
+    /// <summary>
+    /// Replaces the dedicated access with <paramref name="accesses"/> and returns
+    /// the user's full access, combined with the permissions of <paramref name="currentRole"/>.
+    /// </summary>
+    public ErrorOr<IReadOnlySet<Access>> UpdateDedicatedAccess(IEnumerable<Access> accesses, Role? currentRole)
+    {
+        var accessSet = accesses.ToHashSet();
+
+        if (accessSet.Count == 0)
+            return UserErrors.AtLeastOneAccessShouldBeDefined;
+
+        if (currentRole?.Id != RoleId)
+            return UserErrors.RoleMismatch(RoleId?.ToString(), currentRole?.Id.ToString());
+
+        _dedicatedAccess = accessSet;
+        UpdatedAt = DateTime.UtcNow;
+
+        return ResolveFullAccess(currentRole);
+    }
+
     public ErrorOr<IReadOnlySet<Access>> ResolveFullAccess(Role? currentRole)
     {
         if (currentRole?.Id != RoleId)
