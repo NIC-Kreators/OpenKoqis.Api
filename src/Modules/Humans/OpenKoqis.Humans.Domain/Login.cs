@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using ErrorOr;
 using OpenKoqis.Humans.Domain.Errors;
 using OpenKoqis.Shared.Kernel;
@@ -7,8 +8,12 @@ namespace OpenKoqis.Humans.Domain;
 /// <summary>
 /// A value a user signs in with: a <see cref="Username"/>, an <see cref="Email"/> or a <see cref="PhoneNumber"/>.
 /// </summary>
+[DebuggerDisplay("{Value}")]
 public abstract class Login : ValueObject
 {
+    /// <summary>
+    /// The normalized login as it is stored and compared.
+    /// </summary>
     public required string Value { get; init; }
 
     private protected Login() { }

@@ -2,6 +2,9 @@ using ErrorOr;
 
 namespace OpenKoqis.Humans.Domain.Errors;
 
+/// <summary>
+/// Errors produced by <see cref="Role"/> invariants.
+/// </summary>
 public static class RoleErrors
 {
     public static Error InvalidName => Error.Validation(

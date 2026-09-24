@@ -6,6 +6,9 @@ using OpenKoqis.Shared.Kernel.Rules;
 
 namespace OpenKoqis.Humans.Domain;
 
+/// <summary>
+/// A person's name of one to three words: first name, then optional last and middle names.
+/// </summary>
 [DebuggerDisplay("{FullName}")]
 public class HumanName : ValueObject
 {
@@ -13,10 +16,17 @@ public class HumanName : ValueObject
     public string? LastName { get; init; }
     public string? MiddleName { get; init; }
 
+    /// <summary>
+    /// The name parts joined in the order they were parsed: first, last, middle.
+    /// </summary>
     public string FullName => $"{FirstName} {LastName} {MiddleName}".Trim();
 
     private HumanName() { }
 
+    /// <summary>
+    /// Splits <paramref name="raw"/> on spaces into first, last and middle names;
+    /// every word must consist of letters only.
+    /// </summary>
     public static ErrorOr<HumanName> Parse(string raw)
     {
         if (string.IsNullOrWhiteSpace(raw))

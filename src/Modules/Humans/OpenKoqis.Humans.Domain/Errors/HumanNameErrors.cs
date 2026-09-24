@@ -2,6 +2,9 @@ using ErrorOr;
 
 namespace OpenKoqis.Humans.Domain.Errors;
 
+/// <summary>
+/// Errors produced while parsing a <see cref="HumanName"/>.
+/// </summary>
 public static class HumanNameErrors
 {
     public static Error WrongAmountOfWords(int found)

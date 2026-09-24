@@ -2,6 +2,9 @@ using ErrorOr;
 
 namespace OpenKoqis.Humans.Domain.Errors;
 
+/// <summary>
+/// Errors produced while parsing a <see cref="Login"/> or one of its kinds.
+/// </summary>
 public static class LoginErrors
 {
     public static Error Empty => Error.Validation(

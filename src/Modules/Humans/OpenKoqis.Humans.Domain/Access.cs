@@ -6,6 +6,10 @@ using OpenKoqis.Shared.Kernel.Rules;
 
 namespace OpenKoqis.Humans.Domain;
 
+/// <summary>
+/// A set of permissions granted on a single resource, written as <c>resource:permission,permission</c>.
+/// Resource and permission names are stored lowercased and trimmed.
+/// </summary>
 [DebuggerDisplay("{FriendlyName}")]
 public class Access : ValueObject
 {
@@ -14,11 +18,21 @@ public class Access : ValueObject
     /// </summary>
     private string FriendlyName => $"{Resource}:{string.Join(',', Permissions)}";
 
+    /// <summary>
+    /// The resource the permissions apply to, e.g. <c>bins</c>.
+    /// </summary>
     public required string Resource { get; init; }
+
+    /// <summary>
+    /// The permissions granted on <see cref="Resource"/>, e.g. <c>read</c> or <c>write</c>.
+    /// </summary>
     public required IReadOnlySet<string> Permissions { get; init; }
 
     private Access() { }
 
+    /// <summary>
+    /// Parses an access string of the form <c>resource:permission,permission</c>.
+    /// </summary>
     public static ErrorOr<Access> Parse(string raw)
     {
         var resourceAndPermissions = raw.Split(':');
@@ -35,6 +49,10 @@ public class Access : ValueObject
         return Parse(resource, permissions);
     }
 
+    /// <summary>
+    /// Builds an access from an already separated <paramref name="resource"/> and <paramref name="permissions"/>,
+    /// normalizing both and collecting every invalid name as a separate error.
+    /// </summary>
     public static ErrorOr<Access> Parse(string resource, IEnumerable<string> permissions)
     {
         var trimmed = resource.ToLowerInvariant().Trim();
@@ -63,6 +81,9 @@ public class Access : ValueObject
         };
     }
 
+    /// <summary>
+    /// Combines <paramref name="accesses"/> into one access per resource, uniting their permissions.
+    /// </summary>
     public static IReadOnlySet<Access> Merge(IEnumerable<Access> accesses) =>
         accesses
             .GroupBy(a => a.Resource)

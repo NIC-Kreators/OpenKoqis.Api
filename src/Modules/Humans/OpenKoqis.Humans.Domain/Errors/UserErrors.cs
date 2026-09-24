@@ -2,6 +2,9 @@ using ErrorOr;
 
 namespace OpenKoqis.Humans.Domain.Errors;
 
+/// <summary>
+/// Errors produced by <see cref="User"/> invariants.
+/// </summary>
 public static class UserErrors
 {
     public static Error InvalidIdentityId => Error.Validation(
@@ -20,6 +23,9 @@ public static class UserErrors
         code: "User.RootAdminParallelCreation",
         description: "You cannot create 2 root admins!");
 
+    /// <summary>
+    /// The role passed to a <see cref="User"/> operation is not the one the user is assigned to.
+    /// </summary>
     public static Error RoleMismatch(string? userRole, string? requestedRole) => Error.Failure(
         code: "User.RoleMismatch",
         description: $"Role assigned to the user {userRole ?? "-"} doesn't match the requested role {requestedRole ?? "-"}");

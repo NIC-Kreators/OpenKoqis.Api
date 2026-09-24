@@ -2,6 +2,9 @@ using ErrorOr;
 
 namespace OpenKoqis.Humans.Domain.Errors;
 
+/// <summary>
+/// Errors produced while parsing an <see cref="Access"/>.
+/// </summary>
 public static class AccessErrors
 {
     public static Error InvalidAccessString(ReadOnlySpan<char> received) =>
