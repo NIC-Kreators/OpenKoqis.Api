@@ -37,7 +37,7 @@ public class Role : Entity<Guid>
         if (!NameRules.IsValid(trimmed))
             return RoleErrors.InvalidName;
 
-        var accessSet = attributes.Accesses as HashSet<Access> ?? [.. attributes.Accesses];
+        var accessSet = attributes.Accesses.ToHashSet();
 
         if (accessSet.Count == 0)
             return RoleErrors.AtLeastOneAccessShouldBeDefined;
@@ -57,7 +57,7 @@ public class Role : Entity<Guid>
         if (!NameRules.IsValid(trimmed))
             return RoleErrors.InvalidName;
 
-        Name = name;
+        Name = trimmed;
         UpdatedAt = DateTime.UtcNow;
 
         return Result.Updated;

@@ -10,7 +10,7 @@ public class User : Entity<Guid>
     {
         public required string IdentityId { get; init; }
         public required HumanName Name { get; init; }
-        public Guid? RoleId { get; set; }
+        public Guid? RoleId { get; init; }
         public IEnumerable<Access> DedicatedAccess { get; init; } = [];
     }
 
@@ -44,20 +44,22 @@ public class User : Entity<Guid>
 
     private static ErrorOr<User> CreateUser(CreationAttributes attributes, bool isRoot = false)
     {
-        if (attributes.IdentityId.Length is < 1 or > 2048)
+        var trimmedIdentityId = attributes.IdentityId.Trim();
+
+        if (trimmedIdentityId.Length is < 1 or > 2048)
             return UserErrors.InvalidIdentityId;
 
         if (attributes.RoleId == Guid.Empty)
             return UserErrors.EmptyRoleId;
 
-        var dedicatedAccessSet = attributes.DedicatedAccess as HashSet<Access> ?? [.. attributes.DedicatedAccess];
+        var dedicatedAccessSet = attributes.DedicatedAccess.ToHashSet();
 
         if (dedicatedAccessSet.Count == 0)
             return UserErrors.AtLeastOneAccessShouldBeDefined;
 
         return new User
         {
-            IdentityId = attributes.IdentityId,
+            IdentityId = trimmedIdentityId,
             Name = attributes.Name,
             RoleId = attributes.RoleId,
             _dedicatedAccess = dedicatedAccessSet,
