@@ -43,11 +43,18 @@ public class Access : ValueObject
             .Select(p => p.ToLowerInvariant().Trim())
             .ToHashSet();
 
-        if (!permissionSet.All(p => SystemNameRules.IsValid(p)))
-            return AccessErrors.InvalidPermission(string.Join(", ", permissionSet));
+        List<Error> errors =
+        [
+            .. permissionSet
+                .Where(p => !SystemNameRules.IsValid(p))
+                .Select(p => AccessErrors.InvalidPermission(p))
+        ];
 
         if (!SystemNameRules.IsValid(trimmed, maxLength: 32))
-            return AccessErrors.InvalidResource(trimmed);
+            errors.Add(AccessErrors.InvalidResource(trimmed));
+
+        if (errors.Count > 0)
+            return errors;
 
         return new Access
         {

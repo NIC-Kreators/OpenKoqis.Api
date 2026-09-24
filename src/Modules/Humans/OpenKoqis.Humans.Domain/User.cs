@@ -46,16 +46,21 @@ public class User : Entity<Guid>
     {
         var trimmedIdentityId = attributes.IdentityId.Trim();
 
+        List<Error> errors = [];
+
         if (trimmedIdentityId.Length is < 1 or > 2048)
-            return UserErrors.InvalidIdentityId;
+            errors.Add(UserErrors.InvalidIdentityId);
 
         if (attributes.RoleId == Guid.Empty)
-            return UserErrors.EmptyRoleId;
+            errors.Add(UserErrors.EmptyRoleId);
 
         var dedicatedAccessSet = attributes.DedicatedAccess.ToHashSet();
 
         if (dedicatedAccessSet.Count == 0)
-            return UserErrors.AtLeastOneAccessShouldBeDefined;
+            errors.Add(UserErrors.AtLeastOneAccessShouldBeDefined);
+
+        if (errors.Count > 0)
+            return errors;
 
         return new User
         {

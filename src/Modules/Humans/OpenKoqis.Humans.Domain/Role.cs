@@ -29,18 +29,23 @@ public class Role : Entity<Guid>
 
     public static ErrorOr<Role> Create(CreationAttributes attributes)
     {
+        List<Error> errors = [];
+
         if (attributes.CreatedBy == Guid.Empty)
-            return RoleErrors.CouldntDetermineCreator;
+            errors.Add(RoleErrors.CouldntDetermineCreator);
 
         var trimmed = attributes.Name.Trim();
 
         if (!NameRules.IsValid(trimmed))
-            return RoleErrors.InvalidName;
+            errors.Add(RoleErrors.InvalidName);
 
         var accessSet = attributes.Accesses.ToHashSet();
 
         if (accessSet.Count == 0)
-            return RoleErrors.AtLeastOneAccessShouldBeDefined;
+            errors.Add(RoleErrors.AtLeastOneAccessShouldBeDefined);
+
+        if (errors.Count > 0)
+            return errors;
 
         return new Role
         {

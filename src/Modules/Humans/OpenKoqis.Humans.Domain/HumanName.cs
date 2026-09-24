@@ -24,18 +24,19 @@ public class HumanName : ValueObject
 
         var words = raw.Split(' ');
 
+        List<Error> errors = [];
+
         if (words.Length is < 1 or > 3)
-            return HumanNameErrors.WrongAmountOfWords(words.Length);
+            errors.Add(HumanNameErrors.WrongAmountOfWords(words.Length));
 
         foreach (var (i, word) in words.Index())
-        {
-            var trimmed = word.Trim();
+            words[i] = word.Trim();
 
-            if (NameRules.IsValid(trimmed))
-                return HumanNameErrors.AllSymbolsShouldBeALetter;
+        if (words.Any(w => !NameRules.IsValid(w)))
+            errors.Add(HumanNameErrors.AllSymbolsShouldBeALetter);
 
-            words[i] = trimmed;
-        }
+        if (errors.Count > 0)
+            return errors;
 
         return new HumanName
         {
