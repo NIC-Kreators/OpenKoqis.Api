@@ -19,4 +19,8 @@ public static class UserErrors
     public static Error RootAdminParallelCreation => Error.Conflict(
         code: "User.RootAdminParallelCreation",
         description: "You cannot create 2 root admins!");
+
+    public static Error RoleMismatch(string? userRole, string? requestedRole) => Error.Failure(
+        code: "User.RoleMismatch",
+        description: $"Role assigned to the user {userRole ?? "-"} doesn't match the requested role {requestedRole ?? "-"}");
 }

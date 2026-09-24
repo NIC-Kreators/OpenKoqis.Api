@@ -70,9 +70,7 @@ public class User : Entity<Guid>
     public ErrorOr<IReadOnlySet<Access>> ResolveFullAccess(Role? currentRole)
     {
         if (currentRole?.Id != RoleId)
-            return Error.Failure(
-                code: "User.RoleMismatch",
-                description: $"Role assigned to the user {RoleId} doesn't match the requested role {currentRole?.Id.ToString() ?? "-"}");
+            return UserErrors.RoleMismatch(RoleId?.ToString(), currentRole?.Id.ToString());
 
         if (currentRole is null && !RoleId.HasValue)
             return [];
