@@ -19,9 +19,13 @@ public static class UserErrors
         code: "User.AtLeastOneAccessShouldBeDefined",
         description: "You cannot create a user without any dedicated access.");
 
-    public static Error RootAdminParallelCreation => Error.Conflict(
-        code: "User.RootAdminParallelCreation",
-        description: "You cannot create 2 root admins!");
+    public static Error RootAlreadyExists => Error.Conflict(
+        code: "User.RootAlreadyExists",
+        description: "A root user already exists; there can be only one.");
+
+    public static Error RootAccessIsImmutable => Error.Forbidden(
+        code: "User.RootAccessIsImmutable",
+        description: "The root user bypasses access checks; its role and dedicated access cannot be changed.");
 
     /// <summary>
     /// The role passed to a <see cref="User"/> operation is not the one the user is assigned to.

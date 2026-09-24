@@ -11,7 +11,7 @@ namespace OpenKoqis.Humans.Domain;
 public class User : Entity<Guid>
 {
     /// <summary>
-    /// Input for <see cref="Create"/> and <see cref="CreateRootAdmin"/>.
+    /// Input for <see cref="Create"/>.
     /// </summary>
     public record CreationAttributes
     {
@@ -36,8 +36,6 @@ public class User : Entity<Guid>
         /// </summary>
         public PhoneNumber? PhoneNumber { get; init; }
     }
-
-    private static readonly Lock _rootAdminCreationLock = new();
 
     private HashSet<Access> _dedicatedAccess = [];
 
@@ -91,21 +89,6 @@ public class User : Entity<Guid>
     /// is given, and at least one dedicated access. All validation errors are returned together.
     /// </summary>
     public static ErrorOr<User> Create(CreationAttributes attributes)
-        => CreateUser(attributes);
-
-    /// <summary>
-    /// Creates the root administrator with the same validation as <see cref="Create"/>.
-    /// Fails with <see cref="UserErrors.RootAdminParallelCreation"/> when another thread holds the creation guard.
-    /// </summary>
-    public static ErrorOr<User> CreateRootAdmin(CreationAttributes attributes)
-    {
-        if (!_rootAdminCreationLock.TryEnter())
-            return UserErrors.RootAdminParallelCreation;
-
-        return CreateUser(attributes, isRoot: true);
-    }
-
-    private static ErrorOr<User> CreateUser(CreationAttributes attributes, bool isRoot = false)
     {
         var trimmedIdentityId = attributes.IdentityId.Trim();
 
@@ -144,7 +127,30 @@ public class User : Entity<Guid>
             Name = attributes.Name,
             RoleId = attributes.RoleId,
             _dedicatedAccess = dedicatedAccessSet,
-            IsRoot = isRoot
+            IsRoot = false,
+        };
+    }
+
+    /// <summary>
+    /// Creates the root administrator. The root bypasses the access check, so it has no role
+    /// and no dedicated access. Uniqueness of the root is enforced by persistence, which reports
+    /// a second root as <see cref="UserErrors.RootAlreadyExists"/>.
+    /// </summary>
+    public static ErrorOr<User> CreateRoot(Login login, string identityId, HumanName name)
+    {
+        var trimmedIdentityId = identityId.Trim();
+
+        if (trimmedIdentityId.Length is < 1 or > 2048)
+            return UserErrors.InvalidIdentityId;
+
+        return new User
+        {
+            Login = login,
+            Email = login as Email,
+            PhoneNumber = login as PhoneNumber,
+            IdentityId = trimmedIdentityId,
+            Name = name,
+            IsRoot = true,
         };
     }
 
@@ -161,10 +167,13 @@ public class User : Entity<Guid>
 
     /// <summary>
     /// Assigns <paramref name="newRole"/> (or clears the role when <c>null</c>)
-    /// and returns the user's full access afterwards.
+    /// and returns the user's full access afterwards. Not allowed for the root.
     /// </summary>
     public ErrorOr<IReadOnlySet<Access>> UpdateRole(Role? newRole)
     {
+        if (IsRoot)
+            return UserErrors.RootAccessIsImmutable;
+
         RoleId = newRole?.Id;
         UpdatedAt = DateTime.UtcNow;
 
@@ -174,9 +183,13 @@ public class User : Entity<Guid>
     /// <summary>
     /// Replaces the dedicated access with <paramref name="accesses"/> and returns
     /// the user's full access, combined with the permissions of <paramref name="currentRole"/>.
+    /// Not allowed for the root.
     /// </summary>
     public ErrorOr<IReadOnlySet<Access>> UpdateDedicatedAccess(IEnumerable<Access> accesses, Role? currentRole)
     {
+        if (IsRoot)
+            return UserErrors.RootAccessIsImmutable;
+
         var accessSet = accesses.ToHashSet();
 
         if (accessSet.Count == 0)
