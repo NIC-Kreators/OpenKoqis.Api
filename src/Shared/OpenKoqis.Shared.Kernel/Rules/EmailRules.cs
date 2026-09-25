@@ -1,5 +1,8 @@
 namespace OpenKoqis.Shared.Kernel.Rules;
 
+/// <summary>
+/// Validation of email addresses.
+/// </summary>
 public static class EmailRules
 {
     private const string LocalPartSymbols = ".!#$%&'*+/=?^_`{|}~-";

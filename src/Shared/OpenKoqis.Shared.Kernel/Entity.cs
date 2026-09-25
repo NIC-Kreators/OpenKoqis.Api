@@ -1,9 +1,20 @@
 namespace OpenKoqis.Shared.Kernel;
 
+/// <summary>
+/// Base class for entities: objects with identity. Two instances are equal when they are of the same runtime type
+/// and have the same <see cref="Id"/>, regardless of their other state.
+/// </summary>
+/// <typeparam name="TId">The identifier type.</typeparam>
 public abstract class Entity<TId>(TId id) : IEquatable<Entity<TId>> where TId : IEquatable<TId>
 {
+    /// <summary>
+    /// The identifier of the entity; it does not change over the entity's lifetime.
+    /// </summary>
     public TId Id { get; } = id;
 
+    /// <summary>
+    /// Compares the <see cref="Id"/> of this entity and <paramref name="other"/>.
+    /// </summary>
     public bool Equals(Entity<TId>? other)
     {
         if (other is null)
@@ -12,6 +23,9 @@ public abstract class Entity<TId>(TId id) : IEquatable<Entity<TId>> where TId : 
         return ReferenceEquals(this, other) || other.Id.Equals(Id);
     }
 
+    /// <summary>
+    /// Returns <see langword="true"/> when <paramref name="obj"/> has the same runtime type and the same <see cref="Id"/>.
+    /// </summary>
     public override bool Equals(object? obj)
     {
         if (obj is null)

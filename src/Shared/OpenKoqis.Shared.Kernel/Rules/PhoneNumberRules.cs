@@ -1,5 +1,8 @@
 namespace OpenKoqis.Shared.Kernel.Rules;
 
+/// <summary>
+/// Validation and normalization of phone numbers in E.164 format.
+/// </summary>
 public static class PhoneNumberRules
 {
     private const string Separators = " -.()";
