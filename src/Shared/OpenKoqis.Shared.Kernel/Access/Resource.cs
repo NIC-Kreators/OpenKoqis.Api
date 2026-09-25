@@ -12,7 +12,7 @@ public sealed class Resource : ValueObject
         var trimmed = name.ToLowerInvariant().Trim();
         IReadOnlySet<string> permissionSet = allowedPermissions as IReadOnlySet<string> ?? allowedPermissions.ToHashSet();
 
-        ArgumentOutOfRangeException.ThrowIfLessThan(1, permissionSet.Count);
+        ArgumentOutOfRangeException.ThrowIfLessThan(permissionSet.Count, 1);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
         if (!permissionSet.All(p => SystemNameRules.IsValid(p)) || !SystemNameRules.IsValid(trimmed, maxLength: 32))
