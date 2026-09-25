@@ -10,7 +10,7 @@ public sealed class Resource : ValueObject
     public Resource(string name, IEnumerable<string> allowedPermissions)
     {
         var trimmed = name.ToLowerInvariant().Trim();
-        IReadOnlySet<string> permissionSet = allowedPermissions as IReadOnlySet<string> ?? allowedPermissions.ToHashSet();
+        var permissionSet = allowedPermissions.ToHashSet();
 
         ArgumentOutOfRangeException.ThrowIfLessThan(permissionSet.Count, 1);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
