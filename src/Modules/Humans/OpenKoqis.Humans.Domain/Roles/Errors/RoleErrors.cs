@@ -1,6 +1,6 @@
 using ErrorOr;
 
-namespace OpenKoqis.Humans.Domain.Errors;
+namespace OpenKoqis.Humans.Domain.Roles.Errors;
 
 /// <summary>
 /// Errors produced by <see cref="Role"/> invariants.

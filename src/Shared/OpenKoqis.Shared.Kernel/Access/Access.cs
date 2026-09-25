@@ -1,10 +1,9 @@
 using System.Diagnostics;
 using ErrorOr;
-using OpenKoqis.Humans.Domain.Errors;
-using OpenKoqis.Shared.Kernel;
+using OpenKoqis.Shared.Kernel.Errors;
 using OpenKoqis.Shared.Kernel.Rules;
 
-namespace OpenKoqis.Humans.Domain;
+namespace OpenKoqis.Shared.Kernel.Access;
 
 /// <summary>
 /// A set of permissions granted on a single resource, written as <c>resource:permission,permission</c>.

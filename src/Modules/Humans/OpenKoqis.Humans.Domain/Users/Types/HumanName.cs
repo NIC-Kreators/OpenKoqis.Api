@@ -1,10 +1,10 @@
 using System.Diagnostics;
 using ErrorOr;
-using OpenKoqis.Humans.Domain.Errors;
+using OpenKoqis.Humans.Domain.Users.Errors;
 using OpenKoqis.Shared.Kernel;
 using OpenKoqis.Shared.Kernel.Rules;
 
-namespace OpenKoqis.Humans.Domain;
+namespace OpenKoqis.Humans.Domain.Users.Types;
 
 /// <summary>
 /// A person's name of one to three words: first name, then optional last and middle names.

@@ -1,9 +1,9 @@
 using System.Diagnostics;
 using ErrorOr;
-using OpenKoqis.Humans.Domain.Errors;
+using OpenKoqis.Humans.Domain.Users.Errors;
 using OpenKoqis.Shared.Kernel.Rules;
 
-namespace OpenKoqis.Humans.Domain;
+namespace OpenKoqis.Humans.Domain.Users.Types;
 
 /// <summary>
 /// An email address, stored trimmed and lowercased.

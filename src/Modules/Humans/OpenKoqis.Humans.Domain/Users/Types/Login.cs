@@ -1,9 +1,9 @@
 using System.Diagnostics;
 using ErrorOr;
-using OpenKoqis.Humans.Domain.Errors;
+using OpenKoqis.Humans.Domain.Users.Errors;
 using OpenKoqis.Shared.Kernel;
 
-namespace OpenKoqis.Humans.Domain;
+namespace OpenKoqis.Humans.Domain.Users.Types;
 
 /// <summary>
 /// A value a user signs in with: a <see cref="Username"/>, an <see cref="Email"/> or a <see cref="PhoneNumber"/>.

@@ -1,8 +1,11 @@
 using ErrorOr;
-using OpenKoqis.Humans.Domain.Errors;
+using OpenKoqis.Humans.Domain.Roles;
+using OpenKoqis.Humans.Domain.Users.Errors;
+using OpenKoqis.Humans.Domain.Users.Types;
 using OpenKoqis.Shared.Kernel;
+using OpenKoqis.Shared.Kernel.Access;
 
-namespace OpenKoqis.Humans.Domain;
+namespace OpenKoqis.Humans.Domain.Users;
 
 /// <summary>
 /// A person with an account in the system. Their effective access is the union of the
@@ -27,12 +30,12 @@ public class User : Entity<Guid>
         public IEnumerable<Access> DedicatedAccess { get; init; } = [];
 
         /// <summary>
-        /// Contact email. Defaults to <see cref="Login"/> when the login is an <see cref="Domain.Email"/>.
+        /// Contact email. Defaults to <see cref="Login"/> when the login is an <see cref="Types.Email"/>.
         /// </summary>
         public Email? Email { get; init; }
 
         /// <summary>
-        /// Contact phone number. Defaults to <see cref="Login"/> when the login is a <see cref="Domain.PhoneNumber"/>.
+        /// Contact phone number. Defaults to <see cref="Login"/> when the login is a <see cref="Types.PhoneNumber"/>.
         /// </summary>
         public PhoneNumber? PhoneNumber { get; init; }
     }

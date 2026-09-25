@@ -1,9 +1,9 @@
 using ErrorOr;
 
-namespace OpenKoqis.Humans.Domain.Errors;
+namespace OpenKoqis.Shared.Kernel.Errors;
 
 /// <summary>
-/// Errors produced while parsing an <see cref="Access"/>.
+/// Errors produced while parsing an <see cref="Access.Access"/>.
 /// </summary>
 public static class AccessErrors
 {

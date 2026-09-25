@@ -1,6 +1,7 @@
 using ErrorOr;
+using OpenKoqis.Humans.Domain.Users.Types;
 
-namespace OpenKoqis.Humans.Domain.Errors;
+namespace OpenKoqis.Humans.Domain.Users.Errors;
 
 /// <summary>
 /// Errors produced while parsing a <see cref="Login"/> or one of its kinds.

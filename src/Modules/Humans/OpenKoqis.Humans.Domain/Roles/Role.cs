@@ -1,10 +1,12 @@
 using System.Diagnostics;
 using ErrorOr;
-using OpenKoqis.Humans.Domain.Errors;
+using OpenKoqis.Humans.Domain.Roles.Errors;
+using OpenKoqis.Humans.Domain.Users;
 using OpenKoqis.Shared.Kernel;
+using OpenKoqis.Shared.Kernel.Access;
 using OpenKoqis.Shared.Kernel.Rules;
 
-namespace OpenKoqis.Humans.Domain;
+namespace OpenKoqis.Humans.Domain.Roles;
 
 /// <summary>
 /// A named, reusable set of <see cref="Access"/> entries that can be assigned to users.
