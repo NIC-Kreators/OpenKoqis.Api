@@ -40,9 +40,10 @@ public class Access : ValueObject
             return AccessErrors.InvalidAccessString(raw);
 
         var resource = resourceAndPermissions[0];
-        var permissions = resourceAndPermissions[1].Split(',');
+        var permissions = resourceAndPermissions[1]
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-        if (string.IsNullOrWhiteSpace(resource) || permissions.Any(string.IsNullOrWhiteSpace))
+        if (string.IsNullOrWhiteSpace(resource) || permissions.Length == 0)
             return AccessErrors.InvalidAccessString(raw);
 
         return Parse(resource, permissions);
