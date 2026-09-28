@@ -84,6 +84,10 @@ public class Access : ValueObject
     /// <summary>
     /// Combines <paramref name="accesses"/> into one access per resource, uniting their permissions.
     /// </summary>
+    /// <example>
+    /// {"bin", ["read"]}, {"bin", ["write"]}, {"user", ["write"]}
+    /// -> {"bin", ["read", "write"]}, {"user", ["write"]}
+    /// </example>
     public static IReadOnlySet<Access> Merge(IEnumerable<Access> accesses) =>
         accesses
             .GroupBy(a => a.Resource)
@@ -92,6 +96,22 @@ public class Access : ValueObject
                 Resource = g.Key,
                 Permissions = g.SelectMany(a => a.Permissions).ToHashSet(),
             })
+            .ToHashSet();
+
+    /// <summary>
+    /// Splits <paramref name="accesses"/> into one access per resource–permission pair; the inverse of <see cref="Merge"/>.
+    /// </summary>
+    /// <example>
+    /// {"bin", ["read", "write"]}, {"user", ["write"]}
+    /// -> {"bin", ["read"]}, {"bin", ["write"]}, {"user", ["write"]}
+    /// </example>
+    public static IReadOnlySet<Access> Split(IEnumerable<Access> accesses) =>
+        accesses
+            .SelectMany(a => a.Permissions.Select(p => new Access
+            {
+                Resource = a.Resource,
+                Permissions = new HashSet<string> { p },
+            }))
             .ToHashSet();
 
     protected override IEnumerable<object> GetEqualityComponents()

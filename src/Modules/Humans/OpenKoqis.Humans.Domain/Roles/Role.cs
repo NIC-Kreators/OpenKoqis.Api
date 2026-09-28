@@ -92,12 +92,12 @@ public class Role : Entity<Guid>
     }
 
     /// <summary>
-    /// Adds <paramref name="accesses"/> to the role; entries already present are ignored.
+    /// Adds <paramref name="accessesToAdd"/> to the role; entries already present are ignored.
     /// </summary>
-    public ErrorOr<Updated> GrantAccess(IEnumerable<Access> accesses)
+    public ErrorOr<Updated> GrantAccess(IEnumerable<Access> accessesToAdd)
     {
-        foreach (var access in accesses)
-            _accesses.Add(access);
+        foreach (var accessToAdd in accessesToAdd)
+            _accesses.Add(accessToAdd);
 
         UpdatedAt = DateTime.UtcNow;
 
@@ -105,14 +105,15 @@ public class Role : Entity<Guid>
     }
 
     /// <summary>
-    /// Removes <paramref name="accesses"/> from the role. An entry is removed only when both
+    /// Removes <paramref name="accessesToRemove"/> from the role. An entry is removed only when both
     /// its resource and its full permission set match an existing one.
     /// </summary>
-    public ErrorOr<Updated> RevokeAccess(IEnumerable<Access> accesses)
+    public ErrorOr<Updated> RevokeAccess(IEnumerable<Access> accessesToRemove)
     {
-        foreach (var access in accesses)
-            _accesses.Remove(access);
-
+        // Fuck
+        // Simple explanation: simplify input, simplify current access
+        // Remove with Except the accessesToRemove from _accesses and merge all back again
+        _accesses = [.. Access.Merge(Access.Split(_accesses).Except(Access.Split(accessesToRemove)))];
         UpdatedAt = DateTime.UtcNow;
 
         return Result.Updated;
