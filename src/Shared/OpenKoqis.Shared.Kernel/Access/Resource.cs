@@ -52,7 +52,7 @@ public sealed class Resource : ValueObject
         if (!permissionSet.All(p => SystemNameRules.IsValid(p)) || !SystemNameRules.IsValid(trimmed, maxLength: 32))
             throw new ArgumentException("Invalid permission name format");
 
-        Name = name;
+        Name = trimmed;
         AllowedPermissions = permissionSet;
     }
 
