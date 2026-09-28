@@ -1,3 +1,5 @@
+using System.Collections.Frozen;
+using System.Diagnostics.CodeAnalysis;
 using OpenKoqis.Shared.Kernel.Rules;
 
 namespace OpenKoqis.Shared.Kernel.Access;
@@ -11,25 +13,41 @@ public sealed class Resource : ValueObject
     /// <summary>
     /// The resource name, e.g. <c>bins</c>. Must satisfy <see cref="SystemNameRules"/> with a maximum length of 32.
     /// </summary>
-    public string Name { get; init; }
+    public required string Name { get; init; }
 
     /// <summary>
     /// The permissions that may be granted on this resource. Each must satisfy <see cref="SystemNameRules"/>.
     /// </summary>
-    public IReadOnlySet<string> AllowedPermissions { get; init; }
+    public required IReadOnlySet<string> AllowedPermissions { get; init; }
+
+    /// <summary>
+    /// Common set of the Permissions for new <see cref="Resource"/>, like "read", "write", "edit" and "delete".
+    /// Created to reduce boilerplate with permission setting.
+    /// </summary>
+    public readonly static IReadOnlySet<string> CommonPermissions = FrozenSet.Create("read", "write", "edit", "delete");
+
+    /// <summary>
+    /// Creates a resource, validating <paramref name="name"/>.
+    /// <see cref="AllowedPermissions"/> are equals to <see cref="CommonPermissions"/>.
+    /// </summary>
+    /// <exception cref="ArgumentException">The name or a permission has an invalid format.</exception>
+    [SetsRequiredMembers]
+    public Resource(string name) : this(name, CommonPermissions) { }
 
     /// <summary>
     /// Creates a resource, validating <paramref name="name"/> and <paramref name="allowedPermissions"/>.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="allowedPermissions"/> is empty.</exception>
     /// <exception cref="ArgumentException">The name or a permission has an invalid format.</exception>
+    [SetsRequiredMembers]
     public Resource(string name, IEnumerable<string> allowedPermissions)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
         var trimmed = name.ToLowerInvariant().Trim();
         var permissionSet = allowedPermissions.ToHashSet();
 
         ArgumentOutOfRangeException.ThrowIfLessThan(permissionSet.Count, 1);
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
         if (!permissionSet.All(p => SystemNameRules.IsValid(p)) || !SystemNameRules.IsValid(trimmed, maxLength: 32))
             throw new ArgumentException("Invalid permission name format");
