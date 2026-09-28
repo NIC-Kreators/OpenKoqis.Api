@@ -11,12 +11,12 @@ public sealed class Resource : ValueObject
     /// <summary>
     /// The resource name, e.g. <c>bins</c>. Must satisfy <see cref="SystemNameRules"/> with a maximum length of 32.
     /// </summary>
-    public required string Name { get; init; }
+    public string Name { get; init; }
 
     /// <summary>
     /// The permissions that may be granted on this resource. Each must satisfy <see cref="SystemNameRules"/>.
     /// </summary>
-    public required IReadOnlySet<string> AllowedPermissions { get; init; }
+    public IReadOnlySet<string> AllowedPermissions { get; init; }
 
     /// <summary>
     /// Creates a resource, validating <paramref name="name"/> and <paramref name="allowedPermissions"/>.
