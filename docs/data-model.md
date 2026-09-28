@@ -24,6 +24,26 @@ see [domain-model.md](domain-model.md). This document is deliberately just the f
 
 ## Shared
 
+The shared kernel (`OpenKoqis.Shared.Kernel`). Every module may depend on it; it depends on nothing but `ErrorOr`.
+
+### Building blocks
+
+- `Entity<TId>` — base for entities. Equality is by runtime type and `Id`; nothing else is compared.
+- `ValueObject` — base for value objects. Equality is by runtime type and the components returned from
+  `GetEqualityComponents()`, in order.
+
+### Validation rules
+
+Format rules shared by value objects across modules. Each is a static `IsValid(ReadOnlySpan<char>)`; the tables below
+refer to them by name.
+
+| Rule               | Accepts                                                                                                       |
+|--------------------|---------------------------------------------------------------------------------------------------------------|
+| `SystemNameRules`  | kebab-case: lowercase ASCII letters, digits and single hyphens; starts with a letter; default max length `16` |
+| `NameRules`        | Unicode letters only; default max length `16`                                                                 |
+| `EmailRules`       | A pragmatic subset of RFC 5321, max `254` characters, TLD of `2`+ letters                                     |
+| `PhoneNumberRules` | E.164: `+` followed by `8`–`15` digits, first digit not `0`                                                   |
+
 ### `Latitude` (VO)
 
 A ` readonly record struct` that implements the full numeric interface surface — the ones `Int32` and
@@ -54,17 +74,17 @@ Longitude total = l1 + l2; // -140
 
 ### `GeoPoint` (VO)
 
-| Field       | Type        | 
+| Field       | Type        |
 |-------------|-------------|
-| `Latitude`  | `Latitude`  | 
-| `Longitude` | `Longitude` | 
+| `Latitude`  | `Latitude`  |
+| `Longitude` | `Longitude` |
 
 ### `Resource` (VO)
 
-| Field                | Type                   |
-|----------------------|------------------------|
-| `Name`               | `string`               |
-| `AllowedPermissions` | `IReadOnlySet<stirng>` |
+| Field                | Type                   | Notes                       |
+|----------------------|------------------------|-----------------------------|
+| `Name`               | `string`               | `SystemNameRules`, max `32` |
+| `AllowedPermissions` | `IReadOnlySet<string>` | `SystemNameRules`, `1`+     |
 
 An opaque named thing that `Access` can be granted on. Shared owns the **type**; each module declares its own
 **instances**, because the module that owns `Bin` is the only one that should know `bin` exists:
@@ -73,7 +93,7 @@ An opaque named thing that `Access` can be granted on. Shared owns the **type**;
 // BinVentory
 public static class BinVentoryResources
 {
-    public static readonly Resource Bin = new("bin"); // CommonPermissions.All by default
+    public static readonly Resource Bin = new("bin", CommonPermissions.All);
     public static readonly Resource BinGroup = new("bin-group", CommonPermissions.All);
     public static readonly Resource BinInstall = new("bin-install", ["create", "approve", "reject"]);
 }
@@ -82,9 +102,8 @@ public static class BinVentoryResources
 public class BinVentoryResourceCatalog : IResourceCatalog
 {
     public string ModuleName => "BinVentory";
-    public IReadOnlySet<Resource> All = FrozenSet.Create(Bin, BinGroup, BinInstall);
+    public IReadOnlySet<Resource> All { get; } = FrozenSet.Create(Bin, BinGroup, BinInstall);
 }
-
 ```
 
 The dependency arrow only ever points into Shared. Humans never learns what a bin is, and BinVentory keeps control of
@@ -105,60 +124,95 @@ complete once every module's static class has happened to be touched, so the rol
 depending on which endpoint ran first; it is also not thread-safe, and it leaks between parallel tests. Explicit
 registration at startup is deterministic on all three counts.
 
-## Humans
-
-### HumanName (VO)
-
-| Field        | Type      | Notes    |
-|--------------|-----------|----------|
-| `FirstName`  | `string`  |          |
-| `LastName`   | `string?` |          |
-| `MiddleName` | `string?` |          |
-| `FullName`   | `string`  | Computed |
-
 ### `Access` (VO)
 
-| Field         | Type                   | Notes |
-|---------------|------------------------|-------|
-| `Resource`    | `string`               |       |
-| `Permissions` | `IReadOnlySet<string>` |       |
+| Field         | Type                   | Notes                                            |
+|---------------|------------------------|--------------------------------------------------|
+| `Resource`    | `string`               | Lowercased, trimmed; `SystemNameRules`, max `32` |
+| `Permissions` | `IReadOnlySet<string>` | Lowercased, trimmed; `SystemNameRules`           |
 
-The unit of authorization. Everything else in this context exists to assign `Access`
-to a caller.
+The unit of authorization. Everything in Humans exists to assign `Access` to a caller. It lives in Shared because every
+module checks it, while only Humans assigns it.
 
-Grant-only — there is no deny. Computing `User.Access` is therefore a **merge**, not a concatenation: entries for the
-same `Resource` collapse into one with their `Actions`
-flags OR-ed together.
+Written as `resource:permission,permission` (e.g. `bin:read,write`) and parsed with `Access.Parse`, which reports every
+invalid name as a separate error.
+
+Grant-only — there is no deny. Computing a user's effective access is therefore a **merge**, not a concatenation:
+`Access.Merge` collapses entries for the same `Resource` into one, uniting their `Permissions`.
 
 **RBAC and ABAC are both intended, and either can be used alone.** An operator can run OpenKoqis with roles only, with
 attribute rules only, or with both layered. Which of those the market actually wants is unknown, so the model
 deliberately keeps all three open rather than committing early.
 
+## Humans
+
+### `HumanName` (VO)
+
+| Field        | Type      | Notes                                      |
+|--------------|-----------|--------------------------------------------|
+| `FirstName`  | `string`  | `NameRules`                                |
+| `LastName`   | `string?` | `NameRules`                                |
+| `MiddleName` | `string?` | `NameRules`                                |
+| `FullName`   | `string`  | Computed: first, last, middle; compared on |
+
+Parsed from a single string of one to three space-separated words, taken in the order first, last, middle.
+
+### `Login` (VO)
+
+| Field   | Type     | Notes                                   |
+|---------|----------|-----------------------------------------|
+| `Value` | `string` | Normalized form, as stored and compared |
+
+What a user signs in with. Abstract, with exactly three kinds; `Login.Parse` picks one from the raw input:
+
+| Kind          | Chosen when        | `Value`                                                  |
+|---------------|--------------------|----------------------------------------------------------|
+| `Email`       | input contains `@` | Trimmed, lowercased; `EmailRules`                        |
+| `PhoneNumber` | input starts `+`   | E.164, separators `' -.()'` stripped; `PhoneNumberRules` |
+| `Username`    | otherwise          | Trimmed; `SystemNameRules`, max `32`                     |
+
+The kind is part of equality, so a username and an email with the same text are never equal.
+
 ### `Role`
 
-| Field    | Type       | Notes |
-|----------|------------|-------|
-| `Id`     | `Guid`     |       |
-| `Name`   | `string`   |       |
-| `Access` | `Access[]` |       |
+| Field       | Type                   | Notes                |
+|-------------|------------------------|----------------------|
+| `Id`        | `Guid`                 |                      |
+| `Name`      | `string`               | Trimmed; `NameRules` |
+| `Accesses`  | `IReadOnlySet<Access>` | `1`+ at creation     |
+| `CreatedBy` | `Guid`                 | → `User`             |
+| `CreatedAt` | `DateTime`             |                      |
+| `UpdatedAt` | `DateTime`             |                      |
+
+A named, reusable bundle of `Access`. Accesses are granted and revoked as whole entries: revoking removes an entry only
+when both its resource and its full permission set match.
 
 ### `User`
 
 Authentication is delegated to **Keycloak**. The domain stores no credential of any kind — no password, no hash, no
 salt — so there is nothing here to verify against and nothing to leak.
 
-| Field             | Type        | Notes                                                                  |
-|-------------------|-------------|------------------------------------------------------------------------|
-| `Id`              | `Guid`      |                                                                        |
-| `IdentityId`      | `string`    | The Keycloak subject this user maps to                                 |
-| `Name`            | `HumanName` | Friendly display name                                                  |
-| `RoleId`          | `Guid?`     | Moves to Keycloak if roles are managed there                           |
-| `DedicatedAccess` | `Access[]`  | Grants specific to this user                                           |
-| `LocationId`      | `Guid?`     | → `Location`                                                           |
-| `IsRoot`          | `bool`      | Bypasses the access check entirely                                     |
-| `CreatedAt`       | `DateTime`  |                                                                        |
-| `UpdatedAt`       | `DateTime`  |                                                                        |
-| `DeletedAt`       | `DateTime?` | Soft delete, 7-day retention                                           |
+| Field             | Type                   | Notes                                                         |
+|-------------------|------------------------|---------------------------------------------------------------|
+| `Id`              | `Guid`                 |                                                               |
+| `Login`           | `Login`                | What the user signs in with                                   |
+| `Email`           | `Email?`               | Contact email; defaults to `Login` when it is an `Email`      |
+| `PhoneNumber`     | `PhoneNumber?`         | Contact phone; defaults to `Login` when it is a `PhoneNumber` |
+| `IdentityId`      | `string`               | The Keycloak subject this user maps to; `1`–`2048` chars      |
+| `Name`            | `HumanName`            | Friendly display name                                         |
+| `RoleId`          | `Guid?`                | → `Role`. Moves to Keycloak if roles are managed there        |
+| `DedicatedAccess` | `IReadOnlySet<Access>` | Grants specific to this user; `1`+ for a non-root user        |
+| `LocationId`      | `Guid?`                | → `Location`                                                  |
+| `IsRoot`          | `bool`                 | Bypasses the access check entirely                            |
+| `CreatedAt`       | `DateTime`             |                                                               |
+| `UpdatedAt`       | `DateTime`             |                                                               |
+| `DeletedAt`       | `DateTime?`            | Soft delete, 7-day retention                                  |
+
+Effective access is `DedicatedAccess` merged with the role's `Accesses` (see `Access`). Resolving it takes the user's
+current `Role` and rejects any other role with `User.RoleMismatch`.
+
+There is exactly one **root** user. It has no role and no dedicated access, and both are immutable. Uniqueness is
+enforced by persistence, which reports a second root as `User.RootAlreadyExists`.
 
 ## Geography
 
@@ -310,10 +364,12 @@ Markers: ⚪ planned · 🟡 partial, diverges from this document · 🟢 matche
 | Type                                  | Status | Notes                                   |
 |---------------------------------------|--------|-----------------------------------------|
 | `Latitude` / `Longitude` / `GeoPoint` | ⚪     | Coordinates are loose primitives        |
-| `Resource` / `IResourceCatalog`       | ⚪     |                                         |
-| `Access` / `Role`                     | 🟡     | Role enum, no resource-level grants     |
-| `HumanName`                           | ⚪     |                                         |
-| `User`                                | 🟡     | Holds credentials; no `SubjectId`       |
+| `Entity` / `ValueObject` / rules      | 🟢     |                                         |
+| `Resource` / `IResourceCatalog`       | 🟡     | No `ModuleName`; no module catalogs yet |
+| `Access`                              | 🟢     |                                         |
+| `HumanName` / `Login`                 | 🟢     |                                         |
+| `Role`                                | 🟢     | Domain only; not persisted              |
+| `User`                                | 🟡     | Domain only; not persisted, no Keycloak |
 | `Location`                            | ⚪     |                                         |
 | `FillLevel` / `BinTelemetry`          | 🟡     | Present, not modelled as value objects  |
 | `BinVolume`                           | ⚪     |                                         |
