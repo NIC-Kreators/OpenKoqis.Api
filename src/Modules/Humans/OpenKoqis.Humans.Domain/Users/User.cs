@@ -217,9 +217,6 @@ public class User : Entity<Guid>
         if (currentRole?.Id != RoleId)
             return UserErrors.RoleMismatch(RoleId?.ToString(), currentRole?.Id.ToString());
 
-        if (currentRole is null && !RoleId.HasValue)
-            return [];
-
         var allPossibleAccess = _dedicatedAccess
             .Concat(currentRole?.Accesses ?? (IEnumerable<Access>)[]);
 
