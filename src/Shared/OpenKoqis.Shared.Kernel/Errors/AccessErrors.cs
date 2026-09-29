@@ -26,6 +26,14 @@ public static class AccessErrors
     /// <summary>
     /// A permission name does not satisfy <see cref="Rules.SystemNameRules"/>.
     /// </summary>
+    public static Error NoPermissions =>
+        Error.Validation(
+            code: "Access.NoPermissions",
+            description: $"Access should contain at least one permission");
+
+    /// <summary>
+    /// A permission name does not satisfy <see cref="Rules.SystemNameRules"/>.
+    /// </summary>
     public static Error InvalidPermission(ReadOnlySpan<char> received) =>
         Error.Validation(
             code: "Access.InvalidPermission",

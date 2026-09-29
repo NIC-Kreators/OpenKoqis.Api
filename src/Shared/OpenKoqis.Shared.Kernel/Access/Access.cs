@@ -57,7 +57,7 @@ public class Access : ValueObject
     {
         var trimmed = resource.ToLowerInvariant().Trim();
 
-        IReadOnlySet<string> permissionSet = permissions
+        var permissionSet = permissions
             .Select(p => p.ToLowerInvariant().Trim())
             .ToHashSet();
 
@@ -67,6 +67,9 @@ public class Access : ValueObject
                 .Where(p => !SystemNameRules.IsValid(p))
                 .Select(p => AccessErrors.InvalidPermission(p))
         ];
+
+        if (permissionSet.Count == 0)
+            errors.Add(AccessErrors.NoPermissions);
 
         if (!SystemNameRules.IsValid(trimmed, maxLength: 32))
             errors.Add(AccessErrors.InvalidResource(trimmed));
