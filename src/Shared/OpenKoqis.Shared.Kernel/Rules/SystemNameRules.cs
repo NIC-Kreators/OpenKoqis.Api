@@ -17,7 +17,7 @@ public static class SystemNameRules
             return false;
 
         foreach (var c in name)
-            if (!char.IsAsciiLetterLower(c) && !char.IsAsciiDigit(c) && c != '-')
+            if (!char.IsAsciiLetterLower(c) && !char.IsAsciiDigit(c) && c != '-' && c != '*')
                 return false;
 
         return !name.Contains("--", StringComparison.Ordinal);
