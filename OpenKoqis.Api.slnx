@@ -4,7 +4,9 @@
   <Folder Name="/Modules/Humans/">
     <Project Path="src/Modules/Humans/OpenKoqis.Humans.Domain/OpenKoqis.Humans.Domain.csproj" />
   </Folder>
-  <Folder Name="/Modules/Humans/Tests/" />
+  <Folder Name="/Modules/Humans/Tests/">
+    <Project Path="src/Modules/Humans/Tests/OpenKoqis.Humans.Domain.UnitTests/OpenKoqis.Humans.Domain.UnitTests.csproj" />
+  </Folder>
   <Folder Name="/Shared/">
     <Project Path="src/Shared/OpenKoqis.Shared.Kernel/OpenKoqis.Shared.Kernel.csproj" />
   </Folder>

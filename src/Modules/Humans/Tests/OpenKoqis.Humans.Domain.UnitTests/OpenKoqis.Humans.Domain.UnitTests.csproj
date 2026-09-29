@@ -5,14 +5,14 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
     </PropertyGroup>
-
+    
     <ItemGroup>
         <PackageReference Include="AwesomeAssertions" Version="9.6.0" />
         <PackageReference Include="TUnit" Version="1.72.0" />
     </ItemGroup>
-
+    
     <ItemGroup>
-        <ProjectReference Include="..\..\OpenKoqis.Shared.Kernel\OpenKoqis.Shared.Kernel.csproj" />
+        <ProjectReference Include="..\..\OpenKoqis.Humans.Domain\OpenKoqis.Humans.Domain.csproj" />
     </ItemGroup>
 
 </Project>
