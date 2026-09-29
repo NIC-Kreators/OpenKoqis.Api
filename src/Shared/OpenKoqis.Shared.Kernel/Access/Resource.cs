@@ -45,7 +45,9 @@ public sealed class Resource : ValueObject
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
         var trimmed = name.ToLowerInvariant().Trim();
-        var permissionSet = allowedPermissions.ToHashSet();
+        var permissionSet = allowedPermissions
+            .Select(p => p.ToLowerInvariant().Trim())
+            .ToHashSet();
 
         ArgumentOutOfRangeException.ThrowIfLessThan(permissionSet.Count, 1);
 
