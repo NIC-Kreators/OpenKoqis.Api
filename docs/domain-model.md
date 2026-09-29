@@ -35,10 +35,26 @@ location is therefore nullable by design, not by accident.
 records (telemetry history, cleaning log, alerts). Without it, a bin still has a
 current state; it just has no past.
 
+Beneath the contexts sits the **Shared kernel**: the `Entity` / `ValueObject` base
+types, common validation rules, coordinates, and the authorization vocabulary —
+`Resource` and `Access`. It is not a context and owns no aggregates; every module may
+depend on it, and it depends on none of them.
+
 ## Diagram
 
 ```mermaid
 classDiagram
+    namespace Shared {
+        class Resource {
+            <<Value Object>>
+        }
+
+        class Access {
+            <<Value Object>>
+            resource:permission,permission
+        }
+    }
+
     namespace Humans {
         class Identity {
             <<Aggregate Root>>
@@ -94,7 +110,11 @@ classDiagram
     }
 
     Identity "1" --> "1" User : authenticates
-    Role "1" --> "0..*" User : grants Access to
+    Role "0..1" --> "0..*" User : assigned to
+    Role "0..*" --> "1" User : CreatedBy
+    Role "1" *-- "1..*" Access : bundles
+    User "1" *-- "0..*" Access : DedicatedAccess
+    Access ..> Resource : granted on
     User "0..*" --> "0..1" Location : LocatedAt
     Bin "0..*" --> "0..1" Location : LocatedAt
     BinGroup "0..*" --> "0..1" Location : LocatedAt
@@ -116,25 +136,31 @@ classDiagram
 credential of any kind; `User` keeps only the profile and authorization data that
 belong to this system, linked to a Keycloak subject.
 
-**`Role`** — A named bundle of `Access` entries, each pairing a resource with the
-actions allowed on it. Roles are a convenience for assigning the same access to many
-users, not the authorization mechanism itself — `Access` is.
+**`Role`** — A named bundle of at least one `Access` entry, each pairing a resource
+with the permissions granted on it. Roles are a convenience for assigning the same
+access to many users, not the authorization mechanism itself — `Access` is. A role
+records the `User` who created it.
 
 Authorization is **RBAC and ABAC together, or either one alone**. An operator can run
 with roles only, with attribute rules only, or with both layered. Which the market
 actually wants is unknown, so the model keeps all three viable rather than committing
 early.
 
-`Resource` is shared vocabulary, but each module declares the resources it owns —
+`Access` and `Resource` live in the Shared kernel, not in Humans: every module checks
+access, while only Humans assigns it. Each module declares the resources it owns —
 BinVentory says `bin` exists, Humans never learns what a bin is. The full list is
 composed at startup for role-building UIs. See
 [data-model.md](data-model.md) for the mechanism.
 
-**`User`** — A person in the system. Effective permissions are computed, not stored:
-`Role.Access` merged with the user's own `DedicatedAccess`, so a single user can be
-granted something without inventing a role for them. `IsRoot` is the escape hatch that
-bypasses the check. Soft-deleted with a 7-day retention window before the record
+**`User`** — A person in the system, signing in with a `Login` — a username, an email,
+or a phone number. Effective permissions are computed, not stored: `Role.Accesses`
+merged with the user's own `DedicatedAccess`, one entry per resource, so a single user
+can be granted something without inventing a role for them. Grants only ever add;
+there is no deny. Soft-deleted with a 7-day retention window before the record
 actually goes.
+
+The **root** user is the escape hatch that bypasses the check. There is exactly one;
+it has no role and no dedicated access, and neither can be changed.
 
 A `User` is optionally `LocatedAt` a `Location` — the field is meaningless when
 Geography is disabled.
@@ -176,7 +202,7 @@ That split is why the context is optional: history is the expensive part of the 
 most of it never read, and an operator who doesn't want to pay for it can switch
 TimeMachine off and keep a fully working system.
 
-**`BinCleaning`****`BinCleaning`** — A fact: this bin was emptied at this time.
+**`BinCleaning`** — A fact: this bin was emptied at this time.
 
 **`BinHistory`** — The telemetry log: one `BinState` reading per entry. This is the
 high-volume table in the system, and the reason the context is separable — it is a
@@ -187,7 +213,7 @@ natural candidate for a time-series store rather than the relational one.
 lifecycle — it is resolved, at a time, by a user — which makes it the one aggregate
 here with an invariant worth protecting.
 
-## TruckBrain (core)
+## TruckBrain (optional)
 
 **`RouteEngine`** — A black box. Its internal structure is deliberately undecided:
 route optimization is an algorithmic and geospatial problem, not a transactional one,
@@ -209,7 +235,7 @@ domain receives discrete facts back, never the raw feed.
   in what order). Decide whether it's a TruckBrain aggregate the core queries, or a
   core aggregate TruckBrain writes into.
 
-- **Attribute rules have no representation yet** — `Access` is `(Resource, Actions)`
+- **Attribute rules have no representation yet** — `Access` is `(Resource, Permissions)`
   with no attributes, so it can express "drivers may read bins" but not "drivers may
   read bins in their own location". Given `User.LocationId` exists, that second form
   is likely wanted. Adding a scope or predicate to `Access` and filtering in query
@@ -228,16 +254,17 @@ domain receives discrete facts back, never the raw feed.
 
 Markers: ⚪ planned · 🟡 partial, diverges from this document · 🟢 matches this document.
 
-| Context / Aggregate | Status | Notes                                           |
-|---------------------|--------|-------------------------------------------------|
-| Humans — `Identity` | ⚪      | Keycloak not integrated                         |
-| Humans — `Role`     | 🟡     | Exists as a `UserRole` enum, not `Access`-based |
-| Humans — `User`     | 🟡     | Stores its own credentials                      |
-| Geography           | ⚪      |                                                 |
-| BinVentory          | 🟡     | `Bin` exists; no `BinGroup`                     |
-| TimeMachine         | 🟡     | `Alert`, `CleaningLog` exist inside the core    |
-| TruckBrain          | ⚪      |                                                 |
-| Module separability | ⚪      | Contexts are not separable in `src/` yet        |
+| Context / Aggregate | Status | Notes                                                                       |
+|---------------------|--------|-----------------------------------------------------------------------------|
+| Shared kernel       | 🟡     | No coordinate types yet; no module declares `Resource`s                     |
+| Humans — `Identity` | ⚪      | Keycloak not integrated                                                     |
+| Humans — `Role`     | 🟢     | Domain only; not persisted or exposed                                       |
+| Humans — `User`     | 🟡     | Domain only; the live API still uses the legacy `User` with credentials     |
+| Geography           | ⚪      |                                                                             |
+| BinVentory          | 🟡     | `Bin` exists; no `BinGroup`                                                 |
+| TimeMachine         | 🟡     | `Alert`, `CleaningLog` exist inside the core                                |
+| TruckBrain          | ⚪      |                                                                             |
+| Module separability | 🟡     | Humans has its own `Domain` project; the rest is still in the legacy layers |
 
 `src/` also contains `ShiftLog`, which has no counterpart in this model — shifts were
 dropped from the target domain and the type is expected to go with the refactor.
