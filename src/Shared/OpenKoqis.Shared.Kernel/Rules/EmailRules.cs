@@ -8,7 +8,7 @@ namespace OpenKoqis.Shared.Kernel.Rules;
 public static class EmailRules
 {
     private static readonly SearchValues<char> _localPartSymbols =
-        SearchValues.Create("!#$%&'*+-/=?^_`{|}~");
+        SearchValues.Create(".!#$%&'*+/=?^_`{|}~-");
 
 
     /// <summary>
