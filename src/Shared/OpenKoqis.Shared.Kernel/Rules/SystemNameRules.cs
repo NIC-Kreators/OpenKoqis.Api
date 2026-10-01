@@ -13,13 +13,13 @@ public static class SystemNameRules
     {
         if (name.Length < 1 || name.Length > maxLength)
             return false;
-        if (!char.IsAsciiLetterLower(name[0]) || name[^1] == '-')
+        if ((!char.IsAsciiLetterLower(name[0]) && name[0] != '*') || name[^1] == '-')
             return false;
 
         foreach (var c in name)
             if (!char.IsAsciiLetterLower(c) && !char.IsAsciiDigit(c) && c != '-' && c != '*')
                 return false;
 
-        return !name.Contains("--", StringComparison.Ordinal);
+        return !name.Contains("--", StringComparison.Ordinal) && !name.Contains("**", StringComparison.Ordinal);
     }
 }

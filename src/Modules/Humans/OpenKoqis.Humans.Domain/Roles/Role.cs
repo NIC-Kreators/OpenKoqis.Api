@@ -33,6 +33,10 @@ public class Role : Entity<Guid>
     public string Name { get; private set; } = null!;
     public IReadOnlySet<Access> Accesses => _accesses;
 
+    public IReadOnlySet<string> RawAccesses => _accesses
+        .SelectMany(a => a.Permissions.Select(p => $"{a}:{p}"))
+        .ToHashSet();
+
     /// <summary>
     /// Id of the <see cref="User"/> who created the role.
     /// </summary>
@@ -96,9 +100,7 @@ public class Role : Entity<Guid>
     /// </summary>
     public ErrorOr<Updated> GrantAccess(IEnumerable<Access> accessesToAdd)
     {
-        foreach (var accessToAdd in accessesToAdd)
-            _accesses.Add(accessToAdd);
-
+        _accesses = [.. Access.Merge(Access.Split(_accesses).Concat(Access.Split(accessesToAdd)))];
         UpdatedAt = DateTime.UtcNow;
 
         return Result.Updated;
