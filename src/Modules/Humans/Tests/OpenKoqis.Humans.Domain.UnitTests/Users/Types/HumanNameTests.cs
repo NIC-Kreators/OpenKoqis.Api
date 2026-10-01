@@ -67,6 +67,19 @@ public class HumanNameTests
     }
 
     /// <summary>
+    /// A word of exactly 16 letters, the maximum, is accepted.
+    /// </summary>
+    [Test]
+    public void Parse_WordOf16Letters_Succeeds()
+    {
+        // Act
+        var name = HumanName.Parse("Ivan Abcdefghijklmnop").Value;
+
+        // Assert
+        name.LastName.Should().Be("Abcdefghijklmnop");
+    }
+
+    /// <summary>
     /// Empty or whitespace-only input returns a single <c>HumanName.WrongAmountOfWords</c> error reporting zero words.
     /// </summary>
     [Test]

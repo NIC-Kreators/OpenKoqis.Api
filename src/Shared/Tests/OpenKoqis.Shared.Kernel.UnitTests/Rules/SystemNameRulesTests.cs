@@ -6,8 +6,8 @@ namespace OpenKoqis.Shared.Kernel.UnitTests.Rules;
 public class SystemNameRulesTests
 {
     /// <summary>
-    /// Kebab-case names of 1 to 16 characters are accepted: lowercase ASCII letters, digits, single hyphens
-    /// and the '*' wildcard, starting with a letter.
+    /// Kebab-case names of 1 to 16 characters are accepted: lowercase ASCII letters, digits and single hyphens,
+    /// starting with a letter.
     /// </summary>
     [Test]
     [Arguments("a")]
@@ -15,7 +15,6 @@ public class SystemNameRulesTests
     [Arguments("bin2")]
     [Arguments("cleaning-log")]
     [Arguments("a-b-c")]
-    [Arguments("bin*")]
     [Arguments("abcdefghijklmnop")]
     public void IsValid_KebabCaseName_ReturnsTrue(string name)
     {
@@ -24,6 +23,46 @@ public class SystemNameRulesTests
 
         // Assert
         isValid.Should().BeTrue();
+    }
+
+    /// <summary>
+    /// A single '*' wildcard may stand for the whole name or for any part of it, including the start.
+    /// </summary>
+    [Test]
+    [Arguments("*")]
+    [Arguments("bin*")]
+    [Arguments("*bin")]
+    [Arguments("b*n")]
+    [Arguments("bin-*")]
+    [Arguments("*-log")]
+    [Arguments("bin*-installment")]
+    [Arguments("bin*-log*")]
+    public void IsValid_NameWithWildcard_ReturnsTrue(string name)
+    {
+        // Act
+        var isValid = SystemNameRules.IsValid(name);
+
+        // Assert
+        isValid.Should().BeTrue();
+    }
+
+    /// <summary>
+    /// Consecutive wildcards are rejected, as are wildcard names that break the hyphen rules.
+    /// </summary>
+    [Test]
+    [Arguments("**")]
+    [Arguments("bin**")]
+    [Arguments("b**n")]
+    [Arguments("-*")]
+    [Arguments("*-")]
+    [Arguments("*--log")]
+    public void IsValid_InvalidWildcardName_ReturnsFalse(string name)
+    {
+        // Act
+        var isValid = SystemNameRules.IsValid(name);
+
+        // Assert
+        isValid.Should().BeFalse();
     }
 
     /// <summary>

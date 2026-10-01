@@ -87,13 +87,14 @@ public class PhoneNumberRulesTests
     }
 
     /// <summary>
-    /// Input longer than 64 characters is rejected before stripping, even if it would normalize to a valid number.
+    /// Input one character over the 64-character maximum is rejected before stripping, even if it would normalize
+    /// to a valid number.
     /// </summary>
     [Test]
-    public void TryNormalize_InputLongerThan64Characters_ReturnsFalse()
+    public void TryNormalize_InputOf65Characters_ReturnsFalse()
     {
-        // Arrange: a valid number padded with spaces to 72 characters
-        var raw = "+7" + new string(' ', 60) + "7011234567";
+        // Arrange: a valid number padded with spaces to 65 characters
+        var raw = "+7" + new string(' ', 53) + "7011234567";
 
         // Act
         var result = PhoneNumberRules.TryNormalize(raw, out var e164);

@@ -230,6 +230,23 @@ public class RoleTests
     }
 
     /// <summary>
+    /// <see cref="Role.GrantAccess"/> with new permissions on a resource the role already has access to
+    /// unites them into that resource's single entry.
+    /// </summary>
+    [Test]
+    public void GrantAccess_NewPermissionsOnExistingResource_AreMergedIntoOneEntry()
+    {
+        // Arrange
+        var role = RoleWith("bins:read", "users:read");
+
+        // Act
+        role.GrantAccess(AccessesOf("bins:write,delete"));
+
+        // Assert
+        role.Accesses.Should().BeEquivalentTo(AccessesOf("bins:read,write,delete", "users:read"));
+    }
+
+    /// <summary>
     /// <see cref="Role.RevokeAccess"/> with every permission of an access removes that access entirely.
     /// </summary>
     [Test]

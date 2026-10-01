@@ -86,6 +86,7 @@ public class AccessTests
     /// </summary>
     [Test]
     [Arguments("")]
+    [Arguments("*")]
     [Arguments("bins")]
     [Arguments("bins:read:write")]
     [Arguments(":read")]
@@ -191,6 +192,23 @@ public class AccessTests
     }
 
     /// <summary>
+    /// A permission of exactly 16 characters, the default maximum, is accepted.
+    /// </summary>
+    [Test]
+    public void Parse_PermissionOf16Characters_ReturnsAccess()
+    {
+        // Arrange
+        var permission = new string('a', 16);
+
+        // Act
+        var result = KernelAccess.Parse($"bins:{permission}");
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        result.Value.Permissions.Should().BeEquivalentTo(permission);
+    }
+
+    /// <summary>
     /// A permission over the default 16-character maximum returns <c>Access.InvalidPermission</c>.
     /// </summary>
     [Test]
@@ -205,6 +223,54 @@ public class AccessTests
         // Assert
         result.IsError.Should().BeTrue();
         result.FirstError.Code.Should().Be("Access.InvalidPermission");
+    }
+
+    /// <summary>
+    /// A '*' wildcard is accepted in the resource, in a permission, or in both, standing for the whole name
+    /// or a part of it.
+    /// </summary>
+    [Test]
+    [Arguments("*:*", "*", "*")]
+    [Arguments("bins:*", "bins", "*")]
+    [Arguments("*:read", "*", "read")]
+    [Arguments("bin*-installment:*", "bin*-installment", "*")]
+    public void Parse_Wildcard_ReturnsAccess(string raw, string expectedResource, string expectedPermission)
+    {
+        // Act
+        var result = KernelAccess.Parse(raw);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        result.Value.Resource.Should().Be(expectedResource);
+        result.Value.Permissions.Should().BeEquivalentTo(expectedPermission);
+    }
+
+    /// <summary>
+    /// A resource made of consecutive wildcards returns a single <c>Access.InvalidResource</c>.
+    /// </summary>
+    [Test]
+    public void Parse_ConsecutiveWildcardsInResource_ReturnsInvalidResource()
+    {
+        // Act
+        var result = KernelAccess.Parse("**:*");
+
+        // Assert
+        result.Errors.Should().ContainSingle()
+            .Which.Code.Should().Be("Access.InvalidResource");
+    }
+
+    /// <summary>
+    /// A permission made of consecutive wildcards returns a single <c>Access.InvalidPermission</c>.
+    /// </summary>
+    [Test]
+    public void Parse_ConsecutiveWildcardsInPermission_ReturnsInvalidPermission()
+    {
+        // Act
+        var result = KernelAccess.Parse("bins:**");
+
+        // Assert
+        result.Errors.Should().ContainSingle()
+            .Which.Code.Should().Be("Access.InvalidPermission");
     }
 
     /// <summary>

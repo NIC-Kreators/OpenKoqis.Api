@@ -76,6 +76,22 @@ public class ResourceTests
     }
 
     /// <summary>
+    /// A permission of exactly 16 characters, the maximum, is accepted.
+    /// </summary>
+    [Test]
+    public void Constructor_PermissionOf16Characters_Succeeds()
+    {
+        // Arrange
+        var permission = new string('a', 16);
+
+        // Act
+        var resource = new Resource("bins", [permission]);
+
+        // Assert
+        resource.AllowedPermissions.Should().BeEquivalentTo([permission]);
+    }
+
+    /// <summary>
     /// A <see langword="null"/> name throws <see cref="ArgumentNullException"/>.
     /// </summary>
     [Test]
