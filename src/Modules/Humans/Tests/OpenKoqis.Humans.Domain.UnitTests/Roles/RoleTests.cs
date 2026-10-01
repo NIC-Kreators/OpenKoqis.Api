@@ -297,6 +297,24 @@ public class RoleTests
     }
 
     /// <summary>
+    /// <see cref="Role.RevokeAccess"/> may leave a role with no access at all, so a role can be emptied for a while
+    /// without unassigning its users; only <see cref="Role.Create"/> requires at least one access.
+    /// </summary>
+    [Test]
+    public void RevokeAccess_EveryAccess_LeavesRoleEmpty()
+    {
+        // Arrange
+        var role = RoleWith("bins:read,write", "users:read");
+
+        // Act
+        var result = role.RevokeAccess(AccessesOf("bins:read,write", "users:read"));
+
+        // Assert
+        result.Value.Should().Be(Result.Updated);
+        role.Accesses.Should().BeEmpty();
+    }
+
+    /// <summary>
     /// Revoking permissions or resources the role never had leaves its accesses as they were.
     /// </summary>
     [Test]
