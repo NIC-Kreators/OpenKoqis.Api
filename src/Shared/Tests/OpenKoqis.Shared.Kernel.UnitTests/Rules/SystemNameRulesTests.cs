@@ -5,6 +5,10 @@ namespace OpenKoqis.Shared.Kernel.UnitTests.Rules;
 
 public class SystemNameRulesTests
 {
+    /// <summary>
+    /// Kebab-case names of 1 to 16 characters are accepted: lowercase ASCII letters, digits, single hyphens
+    /// and the '*' wildcard, starting with a letter.
+    /// </summary>
     [Test]
     [Arguments("a")]
     [Arguments("bins")]
@@ -14,8 +18,18 @@ public class SystemNameRulesTests
     [Arguments("bin*")]
     [Arguments("abcdefghijklmnop")]
     public void IsValid_KebabCaseName_ReturnsTrue(string name)
-        => SystemNameRules.IsValid(name).Should().BeTrue();
+    {
+        // Act
+        var isValid = SystemNameRules.IsValid(name);
 
+        // Assert
+        isValid.Should().BeTrue();
+    }
+
+    /// <summary>
+    /// Names are rejected when empty, longer than 16 characters, containing uppercase or non-ASCII letters,
+    /// starting with a digit or hyphen, ending with a hyphen, containing "--", or containing '_', ' ' or '.'.
+    /// </summary>
     [Test]
     [Arguments("")]
     [Arguments("Bins")]
@@ -30,29 +44,59 @@ public class SystemNameRulesTests
     [Arguments("корзина")]
     [Arguments("abcdefghijklmnopq")]
     public void IsValid_InvalidName_ReturnsFalse(string name)
-        => SystemNameRules.IsValid(name).Should().BeFalse();
+    {
+        // Act
+        var isValid = SystemNameRules.IsValid(name);
 
+        // Assert
+        isValid.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// A custom <c>maxLength</c> raises the limit: a name of exactly that length is accepted.
+    /// </summary>
     [Test]
     public void IsValid_NameAtCustomMaxLength_ReturnsTrue()
     {
+        // Arrange
         var name = new string('a', 32);
 
-        SystemNameRules.IsValid(name, maxLength: 32).Should().BeTrue();
+        // Act
+        var isValid = SystemNameRules.IsValid(name, maxLength: 32);
+
+        // Assert
+        isValid.Should().BeTrue();
     }
 
+    /// <summary>
+    /// A name one character over a custom <c>maxLength</c> is rejected.
+    /// </summary>
     [Test]
     public void IsValid_NameOverCustomMaxLength_ReturnsFalse()
     {
+        // Arrange
         var name = new string('a', 33);
 
-        SystemNameRules.IsValid(name, maxLength: 32).Should().BeFalse();
+        // Act
+        var isValid = SystemNameRules.IsValid(name, maxLength: 32);
+
+        // Assert
+        isValid.Should().BeFalse();
     }
 
+    /// <summary>
+    /// A name one character over the default 16-character maximum is rejected.
+    /// </summary>
     [Test]
     public void IsValid_NameOverDefaultMaxLength_ReturnsFalse()
     {
+        // Arrange
         var name = new string('a', 17);
 
-        SystemNameRules.IsValid(name).Should().BeFalse();
+        // Act
+        var isValid = SystemNameRules.IsValid(name);
+
+        // Assert
+        isValid.Should().BeFalse();
     }
 }
