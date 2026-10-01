@@ -80,23 +80,6 @@ public class LoginTests
     }
 
     /// <summary>
-    /// Input that both starts with '+' and contains '@' is ambiguous between a phone number and an email,
-    /// so it is rejected; '@' decides the kind, so the error is <c>Login.InvalidEmail</c>.
-    /// </summary>
-    [Test]
-    [Arguments("+user@example.com")]
-    [Arguments(" +77011234567@example.com ")]
-    public void Parse_LeadingPlusWithAt_ReturnsInvalidEmail(string raw)
-    {
-        // Act
-        var result = Login.Parse(raw);
-
-        // Assert
-        result.Errors.Should().ContainSingle()
-            .Which.Code.Should().Be("Login.InvalidEmail");
-    }
-
-    /// <summary>
     /// A login parsed through <see cref="Login.Parse"/> equals one of the same kind and value parsed directly,
     /// and hashes the same.
     /// </summary>

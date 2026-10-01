@@ -1,3 +1,5 @@
+using System.Buffers;
+
 namespace OpenKoqis.Shared.Kernel.Rules;
 
 /// <summary>
@@ -5,7 +7,9 @@ namespace OpenKoqis.Shared.Kernel.Rules;
 /// </summary>
 public static class EmailRules
 {
-    private const string LocalPartSymbols = ".!#$%&'*+/=?^_`{|}~-";
+    private static readonly SearchValues<char> _localPartSymbols =
+        SearchValues.Create("!#$%&'*+-/=?^_`{|}~");
+
 
     /// <summary>
     /// Checks a trimmed, lowercased email address against a pragmatic subset of RFC 5321.
@@ -30,7 +34,7 @@ public static class EmailRules
             return false;
 
         foreach (var c in local)
-            if (!char.IsAsciiLetterOrDigit(c) && !LocalPartSymbols.Contains(c))
+            if (!char.IsAsciiLetterOrDigit(c) && !_localPartSymbols.Contains(c))
                 return false;
 
         return true;
