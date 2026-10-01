@@ -20,7 +20,7 @@ public abstract class Entity<TId>(TId id) : IEquatable<Entity<TId>> where TId : 
         if (other is null)
             return false;
 
-        return ReferenceEquals(this, other) || other.Id.Equals(Id);
+        return (ReferenceEquals(this, other) || other.Id.Equals(Id)) && other.GetType() == GetType();
     }
 
     /// <summary>
