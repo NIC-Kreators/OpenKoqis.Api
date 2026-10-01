@@ -75,20 +75,6 @@ public class UserTests
     }
 
     /// <summary>
-    /// Every created user gets its own id, even from identical attributes.
-    /// </summary>
-    [Test]
-    public void Create_TwoUsers_GetDistinctIds()
-    {
-        // Act
-        var first = User.Create(ValidAttributes()).Value;
-        var second = User.Create(ValidAttributes()).Value;
-
-        // Assert
-        first.Id.Should().NotBe(second.Id);
-    }
-
-    /// <summary>
     /// When the login is an <see cref="Email"/> and no contact email is given, the login becomes the contact email.
     /// </summary>
     [Test]

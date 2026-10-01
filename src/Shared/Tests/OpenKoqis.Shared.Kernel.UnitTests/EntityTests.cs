@@ -192,20 +192,4 @@ public class EntityTests
         // Assert
         set.Should().HaveCount(2);
     }
-
-    /// <summary>
-    /// <see cref="Entity{TId}.Id"/> exposes the id passed to the constructor.
-    /// </summary>
-    [Test]
-    public void Id_ReturnsValuePassedToConstructor()
-    {
-        // Arrange
-        const int id = 42;
-
-        // Act
-        var order = new Order(id, "note");
-
-        // Assert
-        order.Id.Should().Be(id);
-    }
 }

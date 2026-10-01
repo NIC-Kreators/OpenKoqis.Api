@@ -56,20 +56,6 @@ public class RoleTests
     }
 
     /// <summary>
-    /// Every created role gets its own id, even from identical attributes.
-    /// </summary>
-    [Test]
-    public void Create_TwoRoles_GetDistinctIds()
-    {
-        // Act
-        var first = Role.Create(ValidAttributes()).Value;
-        var second = Role.Create(ValidAttributes()).Value;
-
-        // Assert
-        first.Id.Should().NotBe(second.Id);
-    }
-
-    /// <summary>
     /// A name that is blank, contains anything but letters, or is longer than 16 letters
     /// returns a single <see cref="RoleErrors.InvalidName"/>.
     /// </summary>

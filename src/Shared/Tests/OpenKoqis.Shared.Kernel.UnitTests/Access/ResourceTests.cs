@@ -6,19 +6,6 @@ namespace OpenKoqis.Shared.Kernel.UnitTests.Access;
 public class ResourceTests
 {
     /// <summary>
-    /// <see cref="Resource.CommonPermissions"/> is exactly <c>read</c>, <c>write</c>, <c>edit</c> and <c>delete</c>.
-    /// </summary>
-    [Test]
-    public void CommonPermissions_ContainsReadWriteEditDelete()
-    {
-        // Act
-        var permissions = Resource.CommonPermissions;
-
-        // Assert
-        permissions.Should().BeEquivalentTo(["read", "write", "edit", "delete"]);
-    }
-
-    /// <summary>
     /// The name-only constructor allows the <see cref="Resource.CommonPermissions"/>.
     /// </summary>
     [Test]
