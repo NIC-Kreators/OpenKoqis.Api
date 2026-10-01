@@ -11,7 +11,6 @@ public abstract class Entity<TId> : IEquatable<Entity<TId>> where TId : IEquatab
     /// Base class for entities: objects with identity. Two instances are equal when they are of the same runtime type
     /// and have the same <see cref="Id"/>, regardless of their other state.
     /// </summary>
-    /// <typeparam name="TId">The identifier type.</typeparam>
     protected Entity(TId id)
     {
         if (id.Equals(default))
