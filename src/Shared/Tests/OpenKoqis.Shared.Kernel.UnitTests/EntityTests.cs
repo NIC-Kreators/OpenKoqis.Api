@@ -11,6 +11,68 @@ public class EntityTests
 
     private sealed class Invoice(int id) : Entity<int>(id);
 
+    private sealed class Ticket(Guid id) : Entity<Guid>(id);
+
+    private sealed class Tag(string id) : Entity<string>(id);
+
+    /// <summary>
+    /// A default <see langword="int"/> id is rejected with <see cref="ArgumentException"/> naming the <c>id</c> parameter.
+    /// </summary>
+    [Test]
+    public void Constructor_DefaultIntId_Throws()
+    {
+        // Act
+        var act = () => new Order(0, "note");
+
+        // Assert
+        act.Should().ThrowExactly<ArgumentException>().WithParameterName("id");
+    }
+
+    /// <summary>
+    /// <see cref="Guid.Empty"/> as an id is rejected with <see cref="ArgumentException"/> naming the <c>id</c> parameter.
+    /// </summary>
+    [Test]
+    public void Constructor_EmptyGuidId_Throws()
+    {
+        // Act
+        var act = () => new Ticket(Guid.Empty);
+
+        // Assert
+        act.Should().ThrowExactly<ArgumentException>().WithParameterName("id");
+    }
+
+    /// <summary>
+    /// A <see langword="null"/> reference-type id is rejected with an <see cref="ArgumentException"/>
+    /// naming the <c>id</c> parameter, not a <see cref="NullReferenceException"/>.
+    /// </summary>
+    [Test]
+    public void Constructor_NullReferenceId_Throws()
+    {
+        // Act
+        var act = () => new Tag(null!);
+
+        // Assert
+        act.Should().Throw<ArgumentException>().WithParameterName("id");
+    }
+
+    /// <summary>
+    /// Non-default ids of value and reference types are accepted.
+    /// </summary>
+    [Test]
+    public void Constructor_NonDefaultId_Succeeds()
+    {
+        // Arrange
+        var guid = Guid.NewGuid();
+
+        // Act
+        var ticket = new Ticket(guid);
+        var tag = new Tag("urgent");
+
+        // Assert
+        ticket.Id.Should().Be(guid);
+        tag.Id.Should().Be("urgent");
+    }
+
     /// <summary>
     /// Two entities of the same type with the same id are equal through every equality route,
     /// even when the rest of their state differs.
