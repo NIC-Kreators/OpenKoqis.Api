@@ -11,9 +11,13 @@ public abstract class Entity<TId> : IEquatable<Entity<TId>> where TId : IEquatab
     /// Base class for entities: objects with identity. Two instances are equal when they are of the same runtime type
     /// and have the same <see cref="Id"/>, regardless of their other state.
     /// </summary>
+    /// <exception cref="ArgumentException">When id received had <c>default</c> value. We can't create such <see cref="Entity{TId}"/>.</exception>
+    /// <exception cref="ArgumentNullException">When id received had <c>null</c> value. We can't create such <see cref="Entity{TId}"/>.</exception>
     protected Entity(TId id)
     {
-        if (id.Equals(default))
+        ArgumentNullException.ThrowIfNull(id);
+
+        if (EqualityComparer<TId>.Default.Equals(id, default))
             throw new ArgumentException("Id of the entity cannot be a default 'empty' value", nameof(id));
 
         Id = id;
