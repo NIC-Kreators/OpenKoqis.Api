@@ -521,20 +521,22 @@ public class UserTests
 
     /// <summary>
     /// Passing a role other than the assigned one to <see cref="User.UpdateDedicatedAccess"/> returns
-    /// <c>User.RoleMismatch</c> and leaves the dedicated access untouched.
+    /// <see cref="UserErrors.RoleMismatch"/> and leaves the dedicated access untouched.
     /// </summary>
     [Test]
     public void UpdateDedicatedAccess_RoleOtherThanAssigned_ReturnsRoleMismatchAndKeepsState()
     {
         // Arrange: the user is assigned one role, and a different role is passed in
-        var user = CreateUser(Guid.NewGuid(), "users:read");
+        var assignedRoleId = Guid.NewGuid();
+        var user = CreateUser(assignedRoleId, "users:read");
         var otherRole = RoleWith();
 
         // Act
         var result = user.UpdateDedicatedAccess(AccessesOf("bins:read"), otherRole);
 
         // Assert
-        result.FirstError.Code.Should().Be("User.RoleMismatch");
+        result.Errors.Should().ContainSingle()
+            .Which.Should().Be(UserErrors.RoleMismatch(assignedRoleId.ToString(), otherRole.Id.ToString()));
         user.DedicatedAccess.Should().BeEquivalentTo(AccessesOf("users:read"));
     }
 
@@ -591,7 +593,7 @@ public class UserTests
     }
 
     /// <summary>
-    /// Passing a role to a user who has none returns a <c>User.RoleMismatch</c> failure
+    /// Passing a role to a user who has none returns a <see cref="UserErrors.RoleMismatch"/> failure
     /// that shows '-' for the missing assigned role.
     /// </summary>
     [Test]
@@ -605,13 +607,12 @@ public class UserTests
         var error = user.ResolveFullAccess(role).FirstError;
 
         // Assert
-        error.Code.Should().Be("User.RoleMismatch");
-        error.Type.Should().Be(ErrorType.Failure);
+        error.Should().Be(UserErrors.RoleMismatch(null, role.Id.ToString()));
         error.Description.Should().Be($"Role assigned to the user - doesn't match the requested role {role.Id}");
     }
 
     /// <summary>
-    /// Passing no role for a user who has one returns a <c>User.RoleMismatch</c> failure
+    /// Passing no role for a user who has one returns a <see cref="UserErrors.RoleMismatch"/> failure
     /// that shows '-' for the missing requested role.
     /// </summary>
     [Test]
@@ -625,7 +626,7 @@ public class UserTests
         var error = user.ResolveFullAccess(null).FirstError;
 
         // Assert
-        error.Code.Should().Be("User.RoleMismatch");
+        error.Should().Be(UserErrors.RoleMismatch(roleId.ToString(), null));
         error.Description.Should().Be($"Role assigned to the user {roleId} doesn't match the requested role -");
     }
 

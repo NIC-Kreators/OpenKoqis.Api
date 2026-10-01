@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using OpenKoqis.Humans.Domain.Users.Errors;
 using OpenKoqis.Humans.Domain.Users.Types;
 
 namespace OpenKoqis.Humans.Domain.UnitTests.Users.Types;
@@ -22,7 +23,7 @@ public class PhoneNumberTests
     }
 
     /// <summary>
-    /// <see langword="null"/>, empty or whitespace-only input returns <c>Login.Empty</c>.
+    /// <see langword="null"/>, empty or whitespace-only input returns <see cref="LoginErrors.Empty"/>.
     /// </summary>
     [Test]
     [Arguments(null)]
@@ -34,12 +35,12 @@ public class PhoneNumberTests
         var result = PhoneNumber.Parse(raw);
 
         // Assert
-        result.FirstError.Code.Should().Be("Login.Empty");
+        result.FirstError.Should().Be(LoginErrors.Empty);
     }
 
     /// <summary>
     /// A number without a country code, with a zero country code, too few digits or letters
-    /// returns <c>Login.InvalidPhoneNumber</c>.
+    /// returns <see cref="LoginErrors.InvalidPhoneNumber"/>.
     /// </summary>
     [Test]
     [Arguments("87011234567")]
@@ -52,7 +53,7 @@ public class PhoneNumberTests
         var result = PhoneNumber.Parse(raw);
 
         // Assert
-        result.FirstError.Code.Should().Be("Login.InvalidPhoneNumber");
+        result.FirstError.Should().Be(LoginErrors.InvalidPhoneNumber);
     }
 
     /// <summary>

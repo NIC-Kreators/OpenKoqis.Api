@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using OpenKoqis.Humans.Domain.Users.Errors;
 using OpenKoqis.Humans.Domain.Users.Types;
 
 namespace OpenKoqis.Humans.Domain.UnitTests.Users.Types;
@@ -80,7 +81,7 @@ public class HumanNameTests
     }
 
     /// <summary>
-    /// Empty or whitespace-only input returns a single <c>HumanName.WrongAmountOfWords</c> error reporting zero words.
+    /// Empty or whitespace-only input returns a single <see cref="HumanNameErrors.WrongAmountOfWords"/> error reporting zero words.
     /// </summary>
     [Test]
     [Arguments("")]
@@ -92,12 +93,11 @@ public class HumanNameTests
 
         // Assert
         result.Errors.Should().ContainSingle()
-            .Which.Code.Should().Be("HumanName.WrongAmountOfWords");
-        result.FirstError.Description.Should().EndWith("Found: 0");
+            .Which.Should().Be(HumanNameErrors.WrongAmountOfWords(0));
     }
 
     /// <summary>
-    /// More than three words returns a single <c>HumanName.WrongAmountOfWords</c> error reporting the word count.
+    /// More than three words returns a single <see cref="HumanNameErrors.WrongAmountOfWords"/> error reporting the word count.
     /// </summary>
     [Test]
     public void Parse_FourWords_ReturnsWrongAmountOfWords()
@@ -107,13 +107,12 @@ public class HumanNameTests
 
         // Assert
         result.Errors.Should().ContainSingle()
-            .Which.Code.Should().Be("HumanName.WrongAmountOfWords");
-        result.FirstError.Description.Should().EndWith("Found: 4");
+            .Which.Should().Be(HumanNameErrors.WrongAmountOfWords(4));
     }
 
     /// <summary>
     /// A word containing a hyphen, apostrophe, digit or punctuation, or longer than 16 letters,
-    /// returns a single <c>HumanName.AllSymbolsShouldBeALetter</c> error.
+    /// returns a single <see cref="HumanNameErrors.AllSymbolsShouldBeALetter"/> error.
     /// </summary>
     [Test]
     [Arguments("Anna-Maria")]
@@ -128,7 +127,7 @@ public class HumanNameTests
 
         // Assert
         result.Errors.Should().ContainSingle()
-            .Which.Code.Should().Be("HumanName.AllSymbolsShouldBeALetter");
+            .Which.Should().Be(HumanNameErrors.AllSymbolsShouldBeALetter);
     }
 
     /// <summary>
@@ -141,9 +140,10 @@ public class HumanNameTests
         var result = HumanName.Parse("A1 B2 C3 D4");
 
         // Assert
-        result.Errors.Select(e => e.Code).Should().BeEquivalentTo(
-            "HumanName.WrongAmountOfWords",
-            "HumanName.AllSymbolsShouldBeALetter");
+        result.Errors.Should().BeEquivalentTo([
+            HumanNameErrors.WrongAmountOfWords(4),
+            HumanNameErrors.AllSymbolsShouldBeALetter,
+        ]);
     }
 
     /// <summary>

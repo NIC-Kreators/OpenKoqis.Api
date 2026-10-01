@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using OpenKoqis.Humans.Domain.Users.Errors;
 using OpenKoqis.Humans.Domain.Users.Types;
 
 namespace OpenKoqis.Humans.Domain.UnitTests.Users.Types;
@@ -21,7 +22,7 @@ public class EmailTests
     }
 
     /// <summary>
-    /// <see langword="null"/>, empty or whitespace-only input returns <c>Login.Empty</c>.
+    /// <see langword="null"/>, empty or whitespace-only input returns <see cref="LoginErrors.Empty"/>.
     /// </summary>
     [Test]
     [Arguments(null)]
@@ -33,11 +34,11 @@ public class EmailTests
         var result = Email.Parse(raw);
 
         // Assert
-        result.FirstError.Code.Should().Be("Login.Empty");
+        result.FirstError.Should().Be(LoginErrors.Empty);
     }
 
     /// <summary>
-    /// Input that fails the email rules returns <c>Login.InvalidEmail</c>.
+    /// Input that fails the email rules returns <see cref="LoginErrors.InvalidEmail"/>.
     /// </summary>
     [Test]
     [Arguments("ivan")]
@@ -50,7 +51,7 @@ public class EmailTests
         var result = Email.Parse(raw);
 
         // Assert
-        result.FirstError.Code.Should().Be("Login.InvalidEmail");
+        result.FirstError.Should().Be(LoginErrors.InvalidEmail);
     }
 
     /// <summary>

@@ -1,5 +1,5 @@
 using AwesomeAssertions;
-using ErrorOr;
+using OpenKoqis.Shared.Kernel.Errors;
 using KernelAccess = OpenKoqis.Shared.Kernel.Access.Access;
 
 namespace OpenKoqis.Shared.Kernel.UnitTests.Access;
@@ -82,7 +82,7 @@ public class AccessTests
 
     /// <summary>
     /// A string that is not exactly <c>resource:permissions</c> with a non-blank resource and at least one
-    /// permission returns a single <c>Access.InvalidAccessString</c> validation error quoting the input.
+    /// permission returns a single <see cref="AccessErrors.InvalidAccessString"/> validation error quoting the input.
     /// </summary>
     [Test]
     [Arguments("")]
@@ -99,15 +99,12 @@ public class AccessTests
         var result = KernelAccess.Parse(raw);
 
         // Assert
-        result.IsError.Should().BeTrue();
-        result.Errors.Should().ContainSingle();
-        result.FirstError.Code.Should().Be("Access.InvalidAccessString");
-        result.FirstError.Type.Should().Be(ErrorType.Validation);
-        result.FirstError.Description.Should().EndWith($"Received: {raw}");
+        result.Errors.Should().ContainSingle()
+            .Which.Should().Be(AccessErrors.InvalidAccessString(raw));
     }
 
     /// <summary>
-    /// A resource that breaks the system-name rules returns a single <c>Access.InvalidResource</c>
+    /// A resource that breaks the system-name rules returns a single <see cref="AccessErrors.InvalidResource"/>
     /// validation error quoting the resource.
     /// </summary>
     [Test]
@@ -117,15 +114,12 @@ public class AccessTests
         var result = KernelAccess.Parse("bin_s:read");
 
         // Assert
-        result.IsError.Should().BeTrue();
-        result.Errors.Should().ContainSingle();
-        result.FirstError.Code.Should().Be("Access.InvalidResource");
-        result.FirstError.Type.Should().Be(ErrorType.Validation);
-        result.FirstError.Description.Should().EndWith("Received: bin_s");
+        result.Errors.Should().ContainSingle()
+            .Which.Should().Be(AccessErrors.InvalidResource("bin_s"));
     }
 
     /// <summary>
-    /// A permission that breaks the system-name rules returns a single <c>Access.InvalidPermission</c>
+    /// A permission that breaks the system-name rules returns a single <see cref="AccessErrors.InvalidPermission"/>
     /// validation error quoting the normalized permission.
     /// </summary>
     [Test]
@@ -135,11 +129,8 @@ public class AccessTests
         var result = KernelAccess.Parse("bins:read,Read_Only");
 
         // Assert
-        result.IsError.Should().BeTrue();
-        result.Errors.Should().ContainSingle();
-        result.FirstError.Code.Should().Be("Access.InvalidPermission");
-        result.FirstError.Type.Should().Be(ErrorType.Validation);
-        result.FirstError.Description.Should().EndWith("Received: read_only");
+        result.Errors.Should().ContainSingle()
+            .Which.Should().Be(AccessErrors.InvalidPermission("read_only"));
     }
 
     /// <summary>
@@ -152,9 +143,11 @@ public class AccessTests
         var result = KernelAccess.Parse("bin_s:re_ad,wr_ite");
 
         // Assert
-        result.IsError.Should().BeTrue();
-        result.Errors.Select(e => e.Code).Should().BeEquivalentTo(
-            "Access.InvalidPermission", "Access.InvalidPermission", "Access.InvalidResource");
+        result.Errors.Should().BeEquivalentTo([
+            AccessErrors.InvalidPermission("re_ad"),
+            AccessErrors.InvalidPermission("wr_ite"),
+            AccessErrors.InvalidResource("bin_s"),
+        ]);
     }
 
     /// <summary>
@@ -175,7 +168,7 @@ public class AccessTests
     }
 
     /// <summary>
-    /// A resource name one character over the 32-character maximum returns <c>Access.InvalidResource</c>.
+    /// A resource name one character over the 32-character maximum returns <see cref="AccessErrors.InvalidResource"/>.
     /// </summary>
     [Test]
     public void Parse_ResourceOf33Characters_ReturnsInvalidResource()
@@ -187,8 +180,8 @@ public class AccessTests
         var result = KernelAccess.Parse($"{resource}:read");
 
         // Assert
-        result.IsError.Should().BeTrue();
-        result.FirstError.Code.Should().Be("Access.InvalidResource");
+        result.Errors.Should().ContainSingle()
+            .Which.Should().Be(AccessErrors.InvalidResource(resource));
     }
 
     /// <summary>
@@ -209,7 +202,7 @@ public class AccessTests
     }
 
     /// <summary>
-    /// A permission over the default 16-character maximum returns <c>Access.InvalidPermission</c>.
+    /// A permission over the default 16-character maximum returns <see cref="AccessErrors.InvalidPermission"/>.
     /// </summary>
     [Test]
     public void Parse_PermissionOver16Characters_ReturnsInvalidPermission()
@@ -221,8 +214,8 @@ public class AccessTests
         var result = KernelAccess.Parse($"bins:{permission}");
 
         // Assert
-        result.IsError.Should().BeTrue();
-        result.FirstError.Code.Should().Be("Access.InvalidPermission");
+        result.Errors.Should().ContainSingle()
+            .Which.Should().Be(AccessErrors.InvalidPermission(permission));
     }
 
     /// <summary>
@@ -246,7 +239,7 @@ public class AccessTests
     }
 
     /// <summary>
-    /// A resource made of consecutive wildcards returns a single <c>Access.InvalidResource</c>.
+    /// A resource made of consecutive wildcards returns a single <see cref="AccessErrors.InvalidResource"/>.
     /// </summary>
     [Test]
     public void Parse_ConsecutiveWildcardsInResource_ReturnsInvalidResource()
@@ -256,11 +249,11 @@ public class AccessTests
 
         // Assert
         result.Errors.Should().ContainSingle()
-            .Which.Code.Should().Be("Access.InvalidResource");
+            .Which.Should().Be(AccessErrors.InvalidResource("**"));
     }
 
     /// <summary>
-    /// A permission made of consecutive wildcards returns a single <c>Access.InvalidPermission</c>.
+    /// A permission made of consecutive wildcards returns a single <see cref="AccessErrors.InvalidPermission"/>.
     /// </summary>
     [Test]
     public void Parse_ConsecutiveWildcardsInPermission_ReturnsInvalidPermission()
@@ -270,7 +263,7 @@ public class AccessTests
 
         // Assert
         result.Errors.Should().ContainSingle()
-            .Which.Code.Should().Be("Access.InvalidPermission");
+            .Which.Should().Be(AccessErrors.InvalidPermission("**"));
     }
 
     /// <summary>
@@ -289,7 +282,7 @@ public class AccessTests
     }
 
     /// <summary>
-    /// An empty permission list returns a single <c>Access.NoPermissions</c> validation error.
+    /// An empty permission list returns a single <see cref="AccessErrors.NoPermissions"/> validation error.
     /// </summary>
     [Test]
     public void ParseSeparated_NoPermissions_ReturnsNoPermissions()
@@ -298,14 +291,12 @@ public class AccessTests
         var result = KernelAccess.Parse("bins", []);
 
         // Assert
-        result.IsError.Should().BeTrue();
-        result.Errors.Should().ContainSingle();
-        result.FirstError.Code.Should().Be("Access.NoPermissions");
-        result.FirstError.Type.Should().Be(ErrorType.Validation);
+        result.Errors.Should().ContainSingle()
+            .Which.Should().Be(AccessErrors.NoPermissions);
     }
 
     /// <summary>
-    /// Unlike the string overload, a blank permission is not skipped: it returns <c>Access.InvalidPermission</c>.
+    /// Unlike the string overload, a blank permission is not skipped: it returns <see cref="AccessErrors.InvalidPermission"/>.
     /// </summary>
     [Test]
     public void ParseSeparated_EmptyPermission_ReturnsInvalidPermission()
@@ -314,13 +305,12 @@ public class AccessTests
         var result = KernelAccess.Parse("bins", ["read", " "]);
 
         // Assert
-        result.IsError.Should().BeTrue();
-        result.Errors.Should().ContainSingle();
-        result.FirstError.Code.Should().Be("Access.InvalidPermission");
+        result.Errors.Should().ContainSingle()
+            .Which.Should().Be(AccessErrors.InvalidPermission(""));
     }
 
     /// <summary>
-    /// An empty resource with no permissions reports both <c>Access.NoPermissions</c> and <c>Access.InvalidResource</c>.
+    /// An empty resource with no permissions reports both <see cref="AccessErrors.NoPermissions"/> and <see cref="AccessErrors.InvalidResource"/>.
     /// </summary>
     [Test]
     public void ParseSeparated_EmptyResourceAndNoPermissions_ReturnsBothErrors()
@@ -329,8 +319,7 @@ public class AccessTests
         var result = KernelAccess.Parse("", []);
 
         // Assert
-        result.IsError.Should().BeTrue();
-        result.Errors.Select(e => e.Code).Should().BeEquivalentTo("Access.NoPermissions", "Access.InvalidResource");
+        result.Errors.Should().BeEquivalentTo([AccessErrors.NoPermissions, AccessErrors.InvalidResource("")]);
     }
 
     /// <summary>

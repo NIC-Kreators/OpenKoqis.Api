@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using OpenKoqis.Humans.Domain.Users.Errors;
 using OpenKoqis.Humans.Domain.Users.Types;
 
 namespace OpenKoqis.Humans.Domain.UnitTests.Users.Types;
@@ -42,7 +43,7 @@ public class LoginTests
     }
 
     /// <summary>
-    /// <see langword="null"/>, empty or whitespace-only input returns <c>Login.Empty</c>.
+    /// <see langword="null"/>, empty or whitespace-only input returns <see cref="LoginErrors.Empty"/>.
     /// </summary>
     [Test]
     [Arguments(null)]
@@ -54,29 +55,58 @@ public class LoginTests
         var result = Login.Parse(raw);
 
         // Assert
-        result.FirstError.Code.Should().Be("Login.Empty");
+        result.FirstError.Should().Be(LoginErrors.Empty);
     }
 
     /// <summary>
-    /// Invalid input returns the single error of the kind it was detected as, not a generic error.
+    /// Invalid input containing '@' returns the single <see cref="LoginErrors.InvalidEmail"/>, not a generic error.
     /// </summary>
     [Test]
-    [Arguments("user@", "Login.InvalidEmail")]
-    [Arguments("@example.com", "Login.InvalidEmail")]
-    [Arguments("+7 701 CALL NOW", "Login.InvalidPhoneNumber")]
-    [Arguments("+0123456789", "Login.InvalidPhoneNumber")]
-    [Arguments("Ivan", "Login.InvalidUsername")]
-    [Arguments("ivan ivanov", "Login.InvalidUsername")]
-    [Arguments("87011234567", "Login.InvalidUsername")]
-    public void Parse_InvalidInput_ReturnsErrorOfDetectedKind(string raw, string expectedCode)
+    [Arguments("user@")]
+    [Arguments("@example.com")]
+    public void Parse_InvalidEmailInput_ReturnsInvalidEmail(string raw)
     {
         // Act
         var result = Login.Parse(raw);
 
         // Assert
-        result.IsError.Should().BeTrue();
         result.Errors.Should().ContainSingle()
-            .Which.Code.Should().Be(expectedCode);
+            .Which.Should().Be(LoginErrors.InvalidEmail);
+    }
+
+    /// <summary>
+    /// Invalid input starting with '+' returns the single <see cref="LoginErrors.InvalidPhoneNumber"/>,
+    /// not a generic error.
+    /// </summary>
+    [Test]
+    [Arguments("+7 701 CALL NOW")]
+    [Arguments("+0123456789")]
+    public void Parse_InvalidPhoneNumberInput_ReturnsInvalidPhoneNumber(string raw)
+    {
+        // Act
+        var result = Login.Parse(raw);
+
+        // Assert
+        result.Errors.Should().ContainSingle()
+            .Which.Should().Be(LoginErrors.InvalidPhoneNumber);
+    }
+
+    /// <summary>
+    /// Any other invalid input, including a phone number without '+', returns the single
+    /// <see cref="LoginErrors.InvalidUsername"/>, not a generic error.
+    /// </summary>
+    [Test]
+    [Arguments("Ivan")]
+    [Arguments("ivan ivanov")]
+    [Arguments("87011234567")]
+    public void Parse_InvalidUsernameInput_ReturnsInvalidUsername(string raw)
+    {
+        // Act
+        var result = Login.Parse(raw);
+
+        // Assert
+        result.Errors.Should().ContainSingle()
+            .Which.Should().Be(LoginErrors.InvalidUsername);
     }
 
     /// <summary>

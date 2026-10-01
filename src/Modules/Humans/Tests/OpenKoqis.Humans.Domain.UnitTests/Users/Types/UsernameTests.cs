@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using OpenKoqis.Humans.Domain.Users.Errors;
 using OpenKoqis.Humans.Domain.Users.Types;
 
 namespace OpenKoqis.Humans.Domain.UnitTests.Users.Types;
@@ -37,7 +38,7 @@ public class UsernameTests
     }
 
     /// <summary>
-    /// <see langword="null"/>, empty or whitespace-only input returns <c>Login.Empty</c>.
+    /// <see langword="null"/>, empty or whitespace-only input returns <see cref="LoginErrors.Empty"/>.
     /// </summary>
     [Test]
     [Arguments(null)]
@@ -49,11 +50,11 @@ public class UsernameTests
         var result = Username.Parse(raw);
 
         // Assert
-        result.FirstError.Code.Should().Be("Login.Empty");
+        result.FirstError.Should().Be(LoginErrors.Empty);
     }
 
     /// <summary>
-    /// Input that is not lowercase kebab-case of at most 32 characters returns <c>Login.InvalidUsername</c>;
+    /// Input that is not lowercase kebab-case of at most 32 characters returns <see cref="LoginErrors.InvalidUsername"/>;
     /// uppercase letters are rejected rather than lowercased.
     /// </summary>
     [Test]
@@ -71,6 +72,6 @@ public class UsernameTests
         var result = Username.Parse(raw);
 
         // Assert
-        result.FirstError.Code.Should().Be("Login.InvalidUsername");
+        result.FirstError.Should().Be(LoginErrors.InvalidUsername);
     }
 }
