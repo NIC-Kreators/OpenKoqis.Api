@@ -5,12 +5,25 @@ namespace OpenKoqis.Shared.Kernel;
 /// and have the same <see cref="Id"/>, regardless of their other state.
 /// </summary>
 /// <typeparam name="TId">The identifier type.</typeparam>
-public abstract class Entity<TId>(TId id) : IEquatable<Entity<TId>> where TId : IEquatable<TId>
+public abstract class Entity<TId> : IEquatable<Entity<TId>> where TId : IEquatable<TId>
 {
+    /// <summary>
+    /// Base class for entities: objects with identity. Two instances are equal when they are of the same runtime type
+    /// and have the same <see cref="Id"/>, regardless of their other state.
+    /// </summary>
+    /// <typeparam name="TId">The identifier type.</typeparam>
+    protected Entity(TId id)
+    {
+        if (id.Equals(default))
+            throw new ArgumentException("Id of the entity cannot be a default 'empty' value", nameof(id));
+
+        Id = id;
+    }
+
     /// <summary>
     /// The identifier of the entity; it does not change over the entity's lifetime.
     /// </summary>
-    public TId Id { get; } = id;
+    public TId Id { get; }
 
     /// <summary>
     /// Compares the <see cref="Id"/> of this entity and <paramref name="other"/>.
