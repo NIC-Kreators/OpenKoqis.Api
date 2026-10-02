@@ -47,7 +47,8 @@ public class SystemNameRulesTests
     }
 
     /// <summary>
-    /// Consecutive wildcards are rejected, as are wildcard names that break the hyphen rules.
+    /// Consecutive wildcards are rejected, and a wildcard does not exempt the rest of the name from the other rules:
+    /// hyphen placement, lowercase ASCII letters only, no '_', and a letter rather than a digit first.
     /// </summary>
     [Test]
     [Arguments("**")]
@@ -56,10 +57,39 @@ public class SystemNameRulesTests
     [Arguments("-*")]
     [Arguments("*-")]
     [Arguments("*--log")]
+    [Arguments("Bin*")]
+    [Arguments("bin_*")]
+    [Arguments("1*")]
     public void IsValid_InvalidWildcardName_ReturnsFalse(string name)
     {
         // Act
         var isValid = SystemNameRules.IsValid(name);
+
+        // Assert
+        isValid.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// '*' counts towards the length like any other character: a wildcard name of exactly 16 characters is accepted.
+    /// </summary>
+    [Test]
+    public void IsValid_WildcardNameOf16Characters_ReturnsTrue()
+    {
+        // Act
+        var isValid = SystemNameRules.IsValid("abcdefghijklmno*");
+
+        // Assert
+        isValid.Should().BeTrue();
+    }
+
+    /// <summary>
+    /// '*' counts towards the length like any other character: a wildcard name of 17 characters is rejected.
+    /// </summary>
+    [Test]
+    public void IsValid_WildcardNameOf17Characters_ReturnsFalse()
+    {
+        // Act
+        var isValid = SystemNameRules.IsValid("abcdefghijklmnop*");
 
         // Assert
         isValid.Should().BeFalse();

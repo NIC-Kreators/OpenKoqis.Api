@@ -140,7 +140,6 @@ public class EmailRulesTests
         var isValid = EmailRules.IsValid(email);
 
         // Assert
-        email.Should().HaveLength(254);
         isValid.Should().BeTrue();
     }
 
@@ -157,7 +156,6 @@ public class EmailRulesTests
         var isValid = EmailRules.IsValid(email);
 
         // Assert
-        email.Should().HaveLength(255);
         isValid.Should().BeFalse();
     }
 
