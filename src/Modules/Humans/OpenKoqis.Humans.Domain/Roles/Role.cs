@@ -34,7 +34,7 @@ public class Role : Entity<Guid>
     public IReadOnlySet<Access> Accesses => _accesses;
 
     public IReadOnlySet<string> RawAccesses => _accesses
-        .SelectMany(a => a.Permissions.Select(p => $"{a}:{p}"))
+        .SelectMany(a => a.Permissions.Select(p => $"{a.Resource}:{p}"))
         .ToHashSet();
 
     /// <summary>
