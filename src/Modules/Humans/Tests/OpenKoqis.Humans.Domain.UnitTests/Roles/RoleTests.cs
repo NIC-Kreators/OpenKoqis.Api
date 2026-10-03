@@ -317,6 +317,104 @@ public class RoleTests
     }
 
     /// <summary>
+    /// <see cref="Role.RawAccesses"/> lists one <c>resource:permission</c> string per permission on every resource.
+    /// </summary>
+    [Test]
+    public void RawAccesses_SeveralResourcesAndPermissions_ReturnsOneStringPerPermission()
+    {
+        // Arrange
+        var role = RoleWith("bins:read,write", "users:read");
+
+        // Act
+        var raw = role.RawAccesses;
+
+        // Assert
+        raw.Should().BeEquivalentTo(["bins:read", "bins:write", "users:read"]);
+    }
+
+    /// <summary>
+    /// <see cref="Role.RawAccesses"/> uses the normalized resource and permissions, and lists a permission
+    /// granted more than once only once.
+    /// </summary>
+    [Test]
+    public void RawAccesses_UnnormalizedAndOverlappingInput_ReturnsNormalizedDistinctStrings()
+    {
+        // Arrange
+        var role = RoleWith(" Bins : Read ", "bins:read,WRITE");
+
+        // Act
+        var raw = role.RawAccesses;
+
+        // Assert
+        raw.Should().BeEquivalentTo(["bins:read", "bins:write"]);
+    }
+
+    /// <summary>
+    /// Wildcards appear in <see cref="Role.RawAccesses"/> as they were granted, not expanded.
+    /// </summary>
+    [Test]
+    public void RawAccesses_Wildcards_AreKeptAsGranted()
+    {
+        // Arrange
+        var role = RoleWith("*:read", "bin*-installment:*");
+
+        // Act
+        var raw = role.RawAccesses;
+
+        // Assert
+        raw.Should().BeEquivalentTo(["*:read", "bin*-installment:*"]);
+    }
+
+    /// <summary>
+    /// <see cref="Role.RawAccesses"/> reflects accesses granted and revoked after the role was created.
+    /// </summary>
+    [Test]
+    public void RawAccesses_AfterGrantAndRevoke_ReflectsCurrentAccesses()
+    {
+        // Arrange
+        var role = RoleWith("bins:read,write");
+
+        // Act
+        role.GrantAccess(AccessesOf("users:read"));
+        role.RevokeAccess(AccessesOf("bins:write"));
+
+        // Assert
+        role.RawAccesses.Should().BeEquivalentTo(["bins:read", "users:read"]);
+    }
+
+    /// <summary>
+    /// <see cref="Role.RawAccesses"/> reflects duplicates after accesses granted.
+    /// </summary>
+    [Test]
+    public void RawAccesses_AfterGrant_DuplicatesStripped()
+    {
+        // Arrange
+        var role = RoleWith("bins:read,write");
+
+        // Act
+        role.GrantAccess(AccessesOf("bins:read"));
+
+        // Assert
+        role.RawAccesses.Should().BeEquivalentTo(["bins:read", "bins:write"]);
+    }
+
+    /// <summary>
+    /// A role whose accesses were all revoked has no raw accesses.
+    /// </summary>
+    [Test]
+    public void RawAccesses_EveryAccessRevoked_ReturnsEmpty()
+    {
+        // Arrange
+        var role = RoleWith("bins:read");
+
+        // Act
+        role.RevokeAccess(AccessesOf("bins:read"));
+
+        // Assert
+        role.RawAccesses.Should().BeEmpty();
+    }
+
+    /// <summary>
     /// A role is equal to itself.
     /// </summary>
     [Test]
