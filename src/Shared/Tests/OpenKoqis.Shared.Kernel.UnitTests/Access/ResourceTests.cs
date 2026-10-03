@@ -107,9 +107,12 @@ public class ResourceTests
     }
 
     /// <summary>
-    /// A name that breaks the system-name rules, or is longer than 32 characters, throws <see cref="ArgumentException"/>.
+    /// A name that breaks the system-name rules, contains a '*' wildcard, or is longer than 32 characters,
+    /// throws <see cref="ArgumentException"/>; wildcards belong to accesses, not to the resources they match.
     /// </summary>
     [Test]
+    [Arguments("*")]
+    [Arguments("bin*")]
     [Arguments("bin_s")]
     [Arguments("1bins")]
     [Arguments("bins-")]
@@ -137,10 +140,12 @@ public class ResourceTests
     }
 
     /// <summary>
-    /// A permission that breaks the system-name rules, is blank or is longer than 16 characters
-    /// throws <see cref="ArgumentException"/>, even when the other permissions are valid.
+    /// A permission that breaks the system-name rules, contains a '*' wildcard, is blank or is longer than
+    /// 16 characters throws <see cref="ArgumentException"/>, even when the other permissions are valid.
     /// </summary>
     [Test]
+    [Arguments("*")]
+    [Arguments("read*")]
     [Arguments("read_only")]
     [Arguments("")]
     [Arguments("aaaaaaaaaaaaaaaaa")]

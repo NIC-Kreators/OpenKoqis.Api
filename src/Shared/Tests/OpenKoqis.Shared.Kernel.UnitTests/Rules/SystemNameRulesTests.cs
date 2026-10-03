@@ -26,6 +26,41 @@ public class SystemNameRulesTests
     }
 
     /// <summary>
+    /// <see cref="SystemNameRules.IsValid"/> rejects '*': wildcards are allowed only by
+    /// <see cref="SystemNameRules.IsValidWildcard"/>.
+    /// </summary>
+    [Test]
+    [Arguments("*")]
+    [Arguments("bin*")]
+    [Arguments("*bin")]
+    [Arguments("b*n")]
+    public void IsValid_NameWithWildcard_ReturnsFalse(string name)
+    {
+        // Act
+        var isValid = SystemNameRules.IsValid(name);
+
+        // Assert
+        isValid.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// <see cref="SystemNameRules.IsValidWildcard"/> accepts plain kebab-case names too: the wildcard is optional.
+    /// </summary>
+    [Test]
+    [Arguments("a")]
+    [Arguments("bins")]
+    [Arguments("cleaning-log")]
+    [Arguments("abcdefghijklmnop")]
+    public void IsValidWildcard_KebabCaseName_ReturnsTrue(string name)
+    {
+        // Act
+        var isValid = SystemNameRules.IsValidWildcard(name);
+
+        // Assert
+        isValid.Should().BeTrue();
+    }
+
+    /// <summary>
     /// A single '*' wildcard may stand for the whole name or for any part of it, including the start.
     /// </summary>
     [Test]
@@ -37,10 +72,10 @@ public class SystemNameRulesTests
     [Arguments("*-log")]
     [Arguments("bin*-installment")]
     [Arguments("bin*-log*")]
-    public void IsValid_NameWithWildcard_ReturnsTrue(string name)
+    public void IsValidWildcard_NameWithWildcard_ReturnsTrue(string name)
     {
         // Act
-        var isValid = SystemNameRules.IsValid(name);
+        var isValid = SystemNameRules.IsValidWildcard(name);
 
         // Assert
         isValid.Should().BeTrue();
@@ -51,6 +86,7 @@ public class SystemNameRulesTests
     /// hyphen placement, lowercase ASCII letters only, no '_', and a letter rather than a digit first.
     /// </summary>
     [Test]
+    [Arguments("")]
     [Arguments("**")]
     [Arguments("bin**")]
     [Arguments("b**n")]
@@ -60,10 +96,10 @@ public class SystemNameRulesTests
     [Arguments("Bin*")]
     [Arguments("bin_*")]
     [Arguments("1*")]
-    public void IsValid_InvalidWildcardName_ReturnsFalse(string name)
+    public void IsValidWildcard_InvalidName_ReturnsFalse(string name)
     {
         // Act
-        var isValid = SystemNameRules.IsValid(name);
+        var isValid = SystemNameRules.IsValidWildcard(name);
 
         // Assert
         isValid.Should().BeFalse();
@@ -73,10 +109,10 @@ public class SystemNameRulesTests
     /// '*' counts towards the length like any other character: a wildcard name of exactly 16 characters is accepted.
     /// </summary>
     [Test]
-    public void IsValid_WildcardNameOf16Characters_ReturnsTrue()
+    public void IsValidWildcard_NameOf16Characters_ReturnsTrue()
     {
         // Act
-        var isValid = SystemNameRules.IsValid("abcdefghijklmno*");
+        var isValid = SystemNameRules.IsValidWildcard("abcdefghijklmno*");
 
         // Assert
         isValid.Should().BeTrue();
@@ -86,13 +122,33 @@ public class SystemNameRulesTests
     /// '*' counts towards the length like any other character: a wildcard name of 17 characters is rejected.
     /// </summary>
     [Test]
-    public void IsValid_WildcardNameOf17Characters_ReturnsFalse()
+    public void IsValidWildcard_NameOf17Characters_ReturnsFalse()
     {
         // Act
-        var isValid = SystemNameRules.IsValid("abcdefghijklmnop*");
+        var isValid = SystemNameRules.IsValidWildcard("abcdefghijklmnop*");
 
         // Assert
         isValid.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// A custom <c>maxLength</c> applies to wildcard names: a name of exactly that length is accepted
+    /// and one character over it is rejected.
+    /// </summary>
+    [Test]
+    public void IsValidWildcard_CustomMaxLength_IsEnforced()
+    {
+        // Arrange
+        var atLimit = new string('a', 31) + "*";
+        var overLimit = new string('a', 32) + "*";
+
+        // Act
+        var atLimitIsValid = SystemNameRules.IsValidWildcard(atLimit, maxLength: 32);
+        var overLimitIsValid = SystemNameRules.IsValidWildcard(overLimit, maxLength: 32);
+
+        // Assert
+        atLimitIsValid.Should().BeTrue();
+        overLimitIsValid.Should().BeFalse();
     }
 
     /// <summary>

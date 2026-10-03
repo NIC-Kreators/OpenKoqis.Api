@@ -55,7 +55,7 @@ public class UsernameTests
 
     /// <summary>
     /// Input that is not lowercase kebab-case of at most 32 characters returns <see cref="LoginErrors.InvalidUsername"/>;
-    /// uppercase letters are rejected rather than lowercased.
+    /// uppercase letters are rejected rather than lowercased, and '*' is not allowed.
     /// </summary>
     [Test]
     [Arguments("Ivan")]
@@ -63,6 +63,7 @@ public class UsernameTests
     [Arguments("ivan-")]
     [Arguments("ivan--ivanov")]
     [Arguments("ivan_ivanov")]
+    [Arguments("ivan*")]
     [Arguments("ivan ivanov")]
     [Arguments("иван")]
     [Arguments("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
