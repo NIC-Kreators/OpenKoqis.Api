@@ -30,7 +30,7 @@ public abstract class ValueObject : IEquatable<ValueObject>
     /// Compares the equality components of this object and <paramref name="other"/>.
     /// </summary>
     public bool Equals(ValueObject? other)
-        => other is not null && GetEqualityComponents().SequenceEqual(other.GetEqualityComponents());
+        => other is not null && other.GetType() == GetType() && GetEqualityComponents().SequenceEqual(other.GetEqualityComponents());
 
     /// <summary>
     /// Returns <see langword="true"/> when <paramref name="obj"/> has the same runtime type and equal components.

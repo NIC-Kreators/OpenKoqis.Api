@@ -33,6 +33,10 @@ public class Role : Entity<Guid>
     public string Name { get; private set; } = null!;
     public IReadOnlySet<Access> Accesses => _accesses;
 
+    public IReadOnlySet<string> RawAccesses => _accesses
+        .SelectMany(a => a.Permissions.Select(p => $"{a.Resource}:{p}"))
+        .ToHashSet();
+
     /// <summary>
     /// Id of the <see cref="User"/> who created the role.
     /// </summary>
@@ -59,7 +63,7 @@ public class Role : Entity<Guid>
         if (!NameRules.IsValid(trimmed))
             errors.Add(RoleErrors.InvalidName);
 
-        var accessSet = attributes.Accesses.ToHashSet();
+        var accessSet = Access.Merge(attributes.Accesses);
 
         if (accessSet.Count == 0)
             errors.Add(RoleErrors.AtLeastOneAccessShouldBeDefined);
@@ -71,7 +75,7 @@ public class Role : Entity<Guid>
         {
             Name = trimmed,
             CreatedBy = attributes.CreatedBy,
-            _accesses = accessSet
+            _accesses = [.. accessSet]
         };
     }
 
@@ -96,9 +100,7 @@ public class Role : Entity<Guid>
     /// </summary>
     public ErrorOr<Updated> GrantAccess(IEnumerable<Access> accessesToAdd)
     {
-        foreach (var accessToAdd in accessesToAdd)
-            _accesses.Add(accessToAdd);
-
+        _accesses = [.. Access.Merge(Access.Split(_accesses).Concat(Access.Split(accessesToAdd)))];
         UpdatedAt = DateTime.UtcNow;
 
         return Result.Updated;

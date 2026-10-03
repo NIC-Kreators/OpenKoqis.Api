@@ -64,14 +64,14 @@ public class Access : ValueObject
         List<Error> errors =
         [
             .. permissionSet
-                .Where(p => !SystemNameRules.IsValid(p))
+                .Where(p => !SystemNameRules.IsValidWildcard(p))
                 .Select(p => AccessErrors.InvalidPermission(p))
         ];
 
         if (permissionSet.Count == 0)
             errors.Add(AccessErrors.NoPermissions);
 
-        if (!SystemNameRules.IsValid(trimmed, maxLength: 32))
+        if (!SystemNameRules.IsValidWildcard(trimmed, maxLength: 32))
             errors.Add(AccessErrors.InvalidResource(trimmed));
 
         if (errors.Count > 0)
