@@ -20,7 +20,7 @@ public static class SystemNameRules
             if (!char.IsAsciiLetterLower(c) && !char.IsAsciiDigit(c) && c != '-')
                 return false;
 
-        return !name.Contains("--", StringComparison.Ordinal) && !name.Contains("**", StringComparison.Ordinal);
+        return !name.Contains("--", StringComparison.Ordinal);
     }
 
     /// <summary>
