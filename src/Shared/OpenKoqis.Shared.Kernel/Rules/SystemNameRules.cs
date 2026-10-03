@@ -13,6 +13,25 @@ public static class SystemNameRules
     {
         if (name.Length < 1 || name.Length > maxLength)
             return false;
+        if (!char.IsAsciiLetterLower(name[0]) || name[^1] == '-')
+            return false;
+
+        foreach (var c in name)
+            if (!char.IsAsciiLetterLower(c) && !char.IsAsciiDigit(c) && c != '-')
+                return false;
+
+        return !name.Contains("--", StringComparison.Ordinal) && !name.Contains("**", StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Checks that <paramref name="name"/> is kebab-case: 1 to <paramref name="maxLength"/> characters of
+    /// lowercase ASCII letters, digits and single hyphens, starting with a letter and not ending with a hyphen.
+    /// Allows wildcards (*) in the string.
+    /// </summary>
+    public static bool IsValidWildcard(ReadOnlySpan<char> name, ushort maxLength = 16)
+    {
+        if (name.Length < 1 || name.Length > maxLength)
+            return false;
         if ((!char.IsAsciiLetterLower(name[0]) && name[0] != '*') || name[^1] == '-')
             return false;
 
