@@ -120,4 +120,6 @@ public class Role : Entity<Guid>
 
         return Result.Updated;
     }
+
+    public override string ToString() => Name;
 }

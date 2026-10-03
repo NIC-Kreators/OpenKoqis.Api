@@ -54,4 +54,6 @@ public class HumanName : ValueObject
     }
 
     protected override IEnumerable<object> GetEqualityComponents() => [FullName];
+
+    public override string ToString() => FullName;
 }

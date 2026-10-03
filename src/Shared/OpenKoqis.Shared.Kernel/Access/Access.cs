@@ -126,4 +126,6 @@ public class Access : ValueObject
         foreach (var permission in sortedPermissions)
             yield return permission;
     }
+
+    public override string ToString() => FriendlyName;
 }

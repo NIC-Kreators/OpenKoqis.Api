@@ -222,4 +222,6 @@ public class User : Entity<Guid>
 
         return Access.Merge(allPossibleAccess).ToErrorOr();
     }
+
+    public override string ToString() => Login.Value;
 }

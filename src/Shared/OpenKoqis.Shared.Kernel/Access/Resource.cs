@@ -67,4 +67,6 @@ public sealed class Resource : ValueObject
         foreach (var permission in sortedPermissions)
             yield return permission;
     }
+
+    public override string ToString() => Name;
 }
