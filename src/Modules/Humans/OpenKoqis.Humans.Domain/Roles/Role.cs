@@ -63,7 +63,7 @@ public class Role : Entity<Guid>
         if (!NameRules.IsValid(trimmed))
             errors.Add(RoleErrors.InvalidName);
 
-        var accessSet = attributes.Accesses.ToHashSet();
+        var accessSet = Access.Merge(attributes.Accesses);
 
         if (accessSet.Count == 0)
             errors.Add(RoleErrors.AtLeastOneAccessShouldBeDefined);
@@ -75,7 +75,7 @@ public class Role : Entity<Guid>
         {
             Name = trimmed,
             CreatedBy = attributes.CreatedBy,
-            _accesses = accessSet
+            _accesses = [.. accessSet]
         };
     }
 
