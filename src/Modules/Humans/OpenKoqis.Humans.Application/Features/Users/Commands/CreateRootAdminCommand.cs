@@ -3,12 +3,14 @@ using Mediator;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenKoqis.Humans.Application.Dto;
+using OpenKoqis.Humans.Application.Features.Users.Errors;
 using OpenKoqis.Humans.Application.Persistence;
 using OpenKoqis.Humans.Application.Services;
 using OpenKoqis.Humans.Application.Services.Errors;
 using OpenKoqis.Humans.Domain.Users;
 using OpenKoqis.Humans.Domain.Users.Errors;
 using OpenKoqis.Humans.Domain.Users.Types;
+using OpenKoqis.Shared.Application.Services;
 
 namespace OpenKoqis.Humans.Application.Features.Users.Commands;
 
@@ -34,9 +36,12 @@ public class CreateRootAdminCommandHandler(
     IHumansUnitOfWork unitOfWork,
     IUserRepository userRepository,
     IIdentityProvider identityProvider,
+    ILockManager lockManager,
     IOptionsMonitor<HumansOptions> options,
     ILogger<CreateRootAdminCommandHandler> logger) : ICommandHandler<CreateRootAdminCommandRequest, ErrorOr<CreateRootAdminCommandResponse>>
 {
+    private const string LockKey = "RootAdminCreation";
+
     public async ValueTask<ErrorOr<CreateRootAdminCommandResponse>> Handle(CreateRootAdminCommandRequest request, CancellationToken cancellationToken)
     {
         var parsedLogin = Login.Parse(request.Login);
@@ -51,6 +56,11 @@ public class CreateRootAdminCommandHandler(
             return inputErrors;
 
         var login = parsedLogin.Value;
+
+        await using var lease = await lockManager.TryLeaseLockAsync(LockKey, logger: logger, ct: cancellationToken);
+
+        if (lease is null)
+            return RootAdminErrors.CreationInProgress;
 
         if (await userRepository.IsRootAlreadyExists(cancellationToken))
             return UserErrors.RootAlreadyExists;
