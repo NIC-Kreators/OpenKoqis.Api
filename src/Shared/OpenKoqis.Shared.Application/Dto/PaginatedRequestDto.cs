@@ -28,7 +28,7 @@ public readonly record struct PaginatedRequestDto
         if (pageSize is 0 or > MaxPageSize)
             return Error.Validation(
                 code: "PaginatedRequest.PageSizeOutOfRange",
-                description: "You can request only page size between 1 and 999");
+                description: $"You can request only page size between 1 and {MaxPageSize}.");
 
         return new PaginatedRequestDto(page, pageSize);
     }

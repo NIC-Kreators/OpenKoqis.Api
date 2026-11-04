@@ -21,6 +21,6 @@ public interface IUserRepository
     /// </summary>
     void Add(User user);
 
-    Task<ErrorOr<Updated>> UpdateUser(User role, CancellationToken ct = default);
+    Task<ErrorOr<Updated>> UpdateUser(User user, CancellationToken ct = default);
     Task<ErrorOr<Deleted>> DeleteUserWithId(Guid id, CancellationToken ct = default);
 }
