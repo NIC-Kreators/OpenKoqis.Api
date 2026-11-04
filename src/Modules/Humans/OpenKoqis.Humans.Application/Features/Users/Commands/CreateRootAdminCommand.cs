@@ -101,6 +101,8 @@ public class CreateRootAdminCommandHandler(
             if (isIdentityCreatedHere)
                 await RollbackCreatedIdentityAsync(identity);
 
+            await identityProvider.RevokeTokens(tokens.Value.RefreshToken, cancellationToken);
+
             return user.Errors;
         }
 
@@ -112,6 +114,8 @@ public class CreateRootAdminCommandHandler(
         {
             if (isIdentityCreatedHere)
                 await RollbackCreatedIdentityAsync(identity);
+
+            await identityProvider.RevokeTokens(tokens.Value.RefreshToken, cancellationToken);
 
             return saved.Errors;
         }
