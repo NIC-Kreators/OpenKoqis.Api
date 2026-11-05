@@ -17,6 +17,11 @@ public interface IUserRepository
     Task<bool> IsRootAlreadyExists(CancellationToken ct = default);
 
     /// <summary>
+    /// Whether any persisted user, soft-deleted ones included, is linked to the identity <paramref name="identityId"/>.
+    /// </summary>
+    Task<bool> IsIdentityLinked(string identityId, CancellationToken ct = default);
+
+    /// <summary>
     /// Starts tracking a new user; it is persisted when <see cref="IHumansUnitOfWork"/> saves changes.
     /// </summary>
     void Add(User user);

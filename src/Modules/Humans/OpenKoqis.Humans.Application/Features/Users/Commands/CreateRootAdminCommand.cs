@@ -31,7 +31,7 @@ public record CreateRootAdminCommandResponse
 /// Creates the root administrator and signs them in. The user is linked to the identity with the given login,
 /// or, when <see cref="HumansOptions.IsIdentityCreationAllowed"/> is set, to a newly created one.
 /// If the user is not saved, for any reason including an exception or cancellation, the session opened by this
-/// call is revoked and an identity created by this call is deleted again.
+/// call is revoked and an identity created by this call is deleted again, unless a persisted user is linked to it.
 /// </summary>
 public class CreateRootAdminCommandHandler(
     IHumansUnitOfWork unitOfWork,
@@ -125,7 +125,7 @@ public class CreateRootAdminCommandHandler(
 
     /// <summary>
     /// Undoes the identity provider side effects of a run that did not save the user: revokes the session it
-    /// opened, then deletes the identity it created. Uses <see cref="CancellationToken.None"/> so it completes
+    /// opened, then deletes the identity it created unless a persisted user is linked to it. Uses <see cref="CancellationToken.None"/> so it completes
     /// even when the request was cancelled, and never throws, so it cannot replace the original failure.
     /// </summary>
     private async Task CompensateAsync(Identity? createdIdentity, TokensDto? issuedTokens)
@@ -158,6 +158,18 @@ public class CreateRootAdminCommandHandler(
     {
         try
         {
+            // The save may have committed before failing, or a concurrent run whose lock expired may have
+            // linked its root to this identity. Deleting it then would leave a user that cannot sign in.
+            if (await userRepository.IsIdentityLinked(identity.Id, CancellationToken.None))
+            {
+                logger.LogWarning(
+                    "Kept identity {IdentityId} (login {Login}) after root admin creation failed: a persisted user is linked to it",
+                    identity.Id,
+                    identity.Login.Value);
+
+                return;
+            }
+
             var deleted = await identityProvider.Delete(identity.Id, CancellationToken.None);
 
             if (deleted.IsError)

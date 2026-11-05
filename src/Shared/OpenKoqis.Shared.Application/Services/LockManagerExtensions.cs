@@ -6,7 +6,7 @@ public static class LockManagerExtensions
 {
     /// <summary>
     /// Tries to take the lock <paramref name="key"/>. Returns a lease that releases it on dispose,
-    /// or <c>null</c> when the lock is held by someone else or could not be acquired.
+    /// or <c>null</c> when the lock is held by someone else. Failures of the lock store are thrown.
     /// </summary>
     public static async Task<LockLease?> TryLeaseLockAsync(
         this ILockManager lockManager,
@@ -15,26 +15,14 @@ public static class LockManagerExtensions
         ILogger? logger = null,
         CancellationToken ct = default)
     {
-        try
-        {
-            var isAcquired = await lockManager.AcquireLockAsync(key, ttl, ct);
+        var ownerToken = await lockManager.AcquireLockAsync(key, ttl, ct);
 
-            if (!isAcquired)
-            {
-                logger?.LogInformation("Lock {Key} is already held by another owner", key);
-                return null;
-            }
-
-            return new LockLease(lockManager, key, logger);
-        }
-        catch (OperationCanceledException)
+        if (!ownerToken.HasValue)
         {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            logger?.LogError(ex, "Failed to acquire lock {Key}", key);
+            logger?.LogInformation("Lock {Key} is already held by another owner", key);
             return null;
         }
+
+        return new LockLease(lockManager, key, ownerToken.Value, logger);
     }
 }
