@@ -13,9 +13,9 @@
 
     <ItemGroup>
         <PackageReference Include="ErrorOr" Version="2.1.1" />
-        <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
+        <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.2.0" />
         <PackageReference Include="Mediator.Abstractions" Version="3.0.2" />
-        <PackageReference Include="MongoDB.Driver" Version="3.11.1" />
+        <PackageReference Include="MongoDB.Driver" Version="3.13.0" />
     </ItemGroup>
 
     <ItemGroup>
