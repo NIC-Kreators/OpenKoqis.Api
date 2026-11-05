@@ -1,0 +1,191 @@
+using ErrorOr;
+using Mediator;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using OpenKoqis.Humans.Application.Dto;
+using OpenKoqis.Humans.Application.Features.Users.Errors;
+using OpenKoqis.Humans.Application.Persistence;
+using OpenKoqis.Humans.Application.Services;
+using OpenKoqis.Humans.Application.Services.Errors;
+using OpenKoqis.Humans.Domain.Users;
+using OpenKoqis.Humans.Domain.Users.Errors;
+using OpenKoqis.Humans.Domain.Users.Types;
+using OpenKoqis.Shared.Application.Services;
+
+namespace OpenKoqis.Humans.Application.Features.Users.Commands;
+
+public class CreateRootAdminCommandRequest : ICommand<ErrorOr<CreateRootAdminCommandResponse>>
+{
+    public required string Login { get; init; }
+    public required string FullName { get; init; }
+    public required string Password { get; init; }
+}
+
+public record CreateRootAdminCommandResponse
+{
+    public required UserDto User { get; init; }
+    public required TokensDto Tokens { get; init; }
+}
+
+/// <summary>
+/// Creates the root administrator and signs them in. The user is linked to the identity with the given login,
+/// or, when <see cref="HumansOptions.IsIdentityCreationAllowed"/> is set, to a newly created one.
+/// If the user is not saved, for any reason including an exception or cancellation, the session opened by this
+/// call is revoked and an identity created by this call is deleted again, unless a persisted user is linked to it.
+/// </summary>
+public class CreateRootAdminCommandHandler(
+    IHumansUnitOfWork unitOfWork,
+    IUserRepository userRepository,
+    IIdentityProvider identityProvider,
+    ILockManager lockManager,
+    IOptionsMonitor<HumansOptions> options,
+    ILogger<CreateRootAdminCommandHandler> logger) : ICommandHandler<CreateRootAdminCommandRequest, ErrorOr<CreateRootAdminCommandResponse>>
+{
+    private const string LockKey = "RootAdminCreation";
+
+    public async ValueTask<ErrorOr<CreateRootAdminCommandResponse>> Handle(CreateRootAdminCommandRequest request, CancellationToken cancellationToken)
+    {
+        var parsedLogin = Login.Parse(request.Login);
+        var parsedName = HumanName.Parse(request.FullName);
+
+        List<Error> inputErrors = [.. parsedLogin.ErrorsOrEmptyList, .. parsedName.ErrorsOrEmptyList];
+
+        if (string.IsNullOrWhiteSpace(request.Password))
+            inputErrors.Add(IdentityErrors.EmptyPassword);
+
+        if (inputErrors.Count is not 0)
+            return inputErrors;
+
+        var login = parsedLogin.Value;
+
+        // Held until the method returns, so the compensation in the finally block also runs under the lock.
+        await using var lease = await lockManager.TryLeaseLockAsync(LockKey, logger: logger, ct: cancellationToken);
+
+        if (lease is null)
+            return RootAdminErrors.CreationInProgress;
+
+        if (await userRepository.IsRootAlreadyExists(cancellationToken))
+            return UserErrors.RootAlreadyExists;
+
+        Identity? createdIdentity = null;
+        TokensDto? issuedTokens = null;
+        var isCommitted = false;
+
+        try
+        {
+            var identity = await identityProvider.FindByLogin(login, cancellationToken);
+
+            if (identity is null)
+            {
+                if (!options.CurrentValue.IsIdentityCreationAllowed)
+                    return IdentityErrors.NotFound(login);
+
+                var created = await identityProvider.Create(login, request.Password, cancellationToken);
+
+                if (created.IsError)
+                    return created.Errors;
+
+                identity = createdIdentity = created.Value;
+            }
+
+            // Also proves that the caller owns an identity that already existed.
+            var tokens = await identityProvider.RequestTokens(login, request.Password, cancellationToken);
+
+            if (tokens.IsError)
+                return tokens.Errors;
+
+            issuedTokens = tokens.Value;
+
+            var user = User.CreateRoot(login, identity.Id, parsedName.Value);
+
+            if (user.IsError)
+                return user.Errors;
+
+            userRepository.Add(user.Value);
+
+            var saved = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+            if (saved.IsError)
+                return saved.Errors;
+
+            isCommitted = true;
+
+            return new CreateRootAdminCommandResponse
+            {
+                User = UserDto.FromUser(user.Value),
+                Tokens = tokens.Value,
+            };
+        }
+        finally
+        {
+            if (!isCommitted)
+                await CompensateAsync(createdIdentity, issuedTokens);
+        }
+    }
+
+    /// <summary>
+    /// Undoes the identity provider side effects of a run that did not save the user: revokes the session it
+    /// opened, then deletes the identity it created unless a persisted user is linked to it. Uses <see cref="CancellationToken.None"/> so it completes
+    /// even when the request was cancelled, and never throws, so it cannot replace the original failure.
+    /// </summary>
+    private async Task CompensateAsync(Identity? createdIdentity, TokensDto? issuedTokens)
+    {
+        if (issuedTokens is { } tokens)
+            await RevokeIssuedTokensAsync(tokens);
+
+        if (createdIdentity is not null)
+            await DeleteCreatedIdentityAsync(createdIdentity);
+    }
+
+    private async Task RevokeIssuedTokensAsync(TokensDto tokens)
+    {
+        try
+        {
+            var revoked = await identityProvider.RevokeTokens(tokens.RefreshToken, CancellationToken.None);
+
+            if (revoked.IsError)
+                logger.LogError(
+                    "Failed to revoke the session opened during root admin creation; it stays active until it expires. Errors: {Errors}",
+                    revoked.Errors);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to revoke the session opened during root admin creation; it stays active until it expires");
+        }
+    }
+
+    private async Task DeleteCreatedIdentityAsync(Identity identity)
+    {
+        try
+        {
+            // The save may have committed before failing, or a concurrent run whose lock expired may have
+            // linked its root to this identity. Deleting it then would leave a user that cannot sign in.
+            if (await userRepository.IsIdentityLinked(identity.Id, CancellationToken.None))
+            {
+                logger.LogWarning(
+                    "Kept identity {IdentityId} (login {Login}) after root admin creation failed: a persisted user is linked to it",
+                    identity.Id,
+                    identity.Login.Value);
+
+                return;
+            }
+
+            var deleted = await identityProvider.Delete(identity.Id, CancellationToken.None);
+
+            if (deleted.IsError)
+                logger.LogError(
+                    "Failed to delete identity {IdentityId} (login {Login}) after root admin creation failed; it is orphaned in the identity provider. Errors: {Errors}",
+                    identity.Id,
+                    identity.Login.Value,
+                    deleted.Errors);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex,
+                "Failed to delete identity {IdentityId} (login {Login}) after root admin creation failed; it is orphaned in the identity provider",
+                identity.Id,
+                identity.Login.Value);
+        }
+    }
+}

@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+        <NuGetAuditMode>direct</NuGetAuditMode>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\Shared\OpenKoqis.Shared.Application\OpenKoqis.Shared.Application.csproj" />
+        <ProjectReference Include="..\OpenKoqis.Humans.Domain\OpenKoqis.Humans.Domain.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Folder Include="Features\Roles\Commands\" />
+        <Folder Include="Features\Roles\Queries\" />
+        <Folder Include="Features\Users\Queries\" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Mediator.Abstractions" Version="3.0.2" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13" />
+        <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.13" />
+    </ItemGroup>
+
+</Project>
