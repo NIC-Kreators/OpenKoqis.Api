@@ -50,12 +50,12 @@ public class User : Entity<Guid>
     /// <summary>
     /// User's contact Email. Can be used for signing in as well.
     /// </summary>
-    public Email? Email { get; init; }
+    public Email? Email { get; private set; }
 
     /// <summary>
     /// User's contact Phone Number. Can be used for signing in as well.
     /// </summary>
-    public PhoneNumber? PhoneNumber { get; init; }
+    public PhoneNumber? PhoneNumber { get; private set; }
 
     /// <summary>
     /// Id of the user in the external identity provider.
@@ -167,6 +167,30 @@ public class User : Entity<Guid>
 
         return Result.Updated;
     }
+
+    /// <summary>
+    /// Replaces the contact email. <c>null</c> falls back to the default of <see cref="Create"/>: the login when it is
+    /// an <see cref="Types.Email"/>, otherwise no contact email. The <see cref="Login"/> and <see cref="PhoneNumber"/>
+    /// are not affected.
+    /// </summary>
+    public ErrorOr<Updated> UpdateEmail(Email? email)
+        => throw new NotImplementedException();
+
+    /// <summary>
+    /// Replaces the contact phone number. <c>null</c> falls back to the default of <see cref="Create"/>: the login when
+    /// it is a <see cref="Types.PhoneNumber"/>, otherwise no contact phone number. The <see cref="Login"/> and
+    /// <see cref="Email"/> are not affected.
+    /// </summary>
+    public ErrorOr<Updated> UpdatePhoneNumber(PhoneNumber? phoneNumber)
+        => throw new NotImplementedException();
+
+    /// <summary>
+    /// Soft-deletes the user by setting <see cref="DeletedAt"/>; the record is purged after the retention window.
+    /// Fails with <see cref="UserErrors.RootCannotBeDeleted"/> for the root and with
+    /// <see cref="UserErrors.AlreadyDeleted"/> when the user is already deleted.
+    /// </summary>
+    public ErrorOr<Deleted> Delete()
+        => throw new NotImplementedException();
 
     /// <summary>
     /// Assigns <paramref name="newRole"/> (or clears the role when <c>null</c>)
