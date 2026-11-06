@@ -174,7 +174,12 @@ public class User : Entity<Guid>
     /// are not affected.
     /// </summary>
     public ErrorOr<Updated> UpdateEmail(Email? email)
-        => throw new NotImplementedException();
+    {
+        Email = email ?? Login as Email;
+        UpdatedAt = DateTime.UtcNow;
+
+        return Result.Updated;
+    }
 
     /// <summary>
     /// Replaces the contact phone number. <c>null</c> falls back to the default of <see cref="Create"/>: the login when
@@ -182,7 +187,12 @@ public class User : Entity<Guid>
     /// <see cref="Email"/> are not affected.
     /// </summary>
     public ErrorOr<Updated> UpdatePhoneNumber(PhoneNumber? phoneNumber)
-        => throw new NotImplementedException();
+    {
+        PhoneNumber = phoneNumber ?? Login as PhoneNumber;
+        UpdatedAt = DateTime.UtcNow;
+
+        return Result.Updated;
+    }
 
     /// <summary>
     /// Soft-deletes the user by setting <see cref="DeletedAt"/>; the record is purged after the retention window.
@@ -190,7 +200,19 @@ public class User : Entity<Guid>
     /// <see cref="UserErrors.AlreadyDeleted"/> when the user is already deleted.
     /// </summary>
     public ErrorOr<Deleted> Delete()
-        => throw new NotImplementedException();
+    {
+        if (IsRoot)
+            return UserErrors.RootCannotBeDeleted;
+
+        if (DeletedAt is not null)
+            return UserErrors.AlreadyDeleted;
+
+        var now = DateTime.UtcNow;
+        DeletedAt = now;
+        UpdatedAt = now;
+
+        return Result.Deleted;
+    }
 
     /// <summary>
     /// Assigns <paramref name="newRole"/> (or clears the role when <c>null</c>)

@@ -3,10 +3,14 @@ using Mediator;
 using Microsoft.Extensions.Logging;
 using OpenKoqis.Humans.Application.Dto;
 using OpenKoqis.Humans.Application.Features.Roles;
+using OpenKoqis.Humans.Application.Features.Roles.Errors;
+using OpenKoqis.Humans.Application.Features.Users.Errors;
 using OpenKoqis.Humans.Application.Persistence;
 using OpenKoqis.Humans.Application.Services;
-
-#pragma warning disable CS9113 // Handle is not implemented yet, so the injected dependencies are unread.
+using OpenKoqis.Humans.Domain.Roles;
+using OpenKoqis.Humans.Domain.Users;
+using OpenKoqis.Humans.Domain.Users.Errors;
+using OpenKoqis.Shared.Kernel.Access;
 
 namespace OpenKoqis.Humans.Application.Features.Users.Commands;
 
@@ -41,6 +45,84 @@ public class UpdateUserAccessCommandHandler(
     IAccessProjection accessProjection,
     ILogger<UpdateUserAccessCommandHandler> logger) : ICommandHandler<UpdateUserAccessCommandRequest, ErrorOr<UpdateUserAccessCommandResponse>>
 {
-    public ValueTask<ErrorOr<UpdateUserAccessCommandResponse>> Handle(UpdateUserAccessCommandRequest request, CancellationToken cancellationToken)
-        => throw new NotImplementedException();
+    public async ValueTask<ErrorOr<UpdateUserAccessCommandResponse>> Handle(UpdateUserAccessCommandRequest request, CancellationToken cancellationToken)
+    {
+        List<Error> inputErrors = [];
+        List<Access> accesses = [];
+
+        foreach (var raw in request.DedicatedAccess)
+        {
+            var parsed = Access.Parse(raw);
+
+            if (parsed.IsError)
+                inputErrors.AddRange(parsed.Errors);
+            else
+                accesses.Add(parsed.Value);
+        }
+
+        if (request.DedicatedAccess.Count is 0)
+            inputErrors.Add(UserErrors.AtLeastOneAccessShouldBeDefined);
+
+        if (request.RoleId == Guid.Empty)
+            inputErrors.Add(UserErrors.EmptyRoleId);
+
+        if (inputErrors.Count is not 0)
+            return inputErrors;
+
+        var user = await userRepository.GetUserWithId(request.Id, cancellationToken);
+
+        if (user is null)
+            return UserFeatureErrors.NotFound(request.Id);
+
+        Role? role = null;
+
+        if (request.RoleId is { } roleId)
+        {
+            role = await roleRepository.GetRoleWithId(roleId, cancellationToken);
+
+            if (role is null)
+                return RoleFeatureErrors.NotFound(roleId);
+        }
+
+        var roleUpdated = user.UpdateRole(role);
+
+        if (roleUpdated.IsError)
+            return roleUpdated.Errors;
+
+        var accessUpdated = user.UpdateDedicatedAccess(accesses, role);
+
+        if (accessUpdated.IsError)
+            return accessUpdated.Errors;
+
+        var saved = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        if (saved.IsError)
+            return saved.Errors;
+
+        if (!await TryProjectAsync(user, role, cancellationToken))
+            return UserFeatureErrors.AccessProjectionFailed(user.Id);
+
+        return new UpdateUserAccessCommandResponse { User = UserDto.FromUser(user) };
+    }
+
+    private async Task<bool> TryProjectAsync(User user, Role? role, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var projected = await accessProjection.UserAccessChanged(user, role, cancellationToken);
+
+            if (!projected.IsError)
+                return true;
+
+            logger.LogError(
+                "Failed to project the access of user {UserId}; repeating the request projects it again. Errors: {Errors}",
+                user.Id, projected.Errors);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to project the access of user {UserId}; repeating the request projects it again", user.Id);
+        }
+
+        return false;
+    }
 }

@@ -3,8 +3,6 @@ using Mediator;
 using OpenKoqis.Humans.Application.Dto;
 using OpenKoqis.Shared.Application.Dto;
 
-#pragma warning disable CS9113 // Handle is not implemented yet, so the injected dependencies are unread.
-
 namespace OpenKoqis.Humans.Application.Features.Users.Queries;
 
 public class GetUsersQueryRequest : IQuery<ErrorOr<PaginatedResponseDto<UserDto>>>
@@ -24,6 +22,17 @@ public class GetUsersQueryRequest : IQuery<ErrorOr<PaginatedResponseDto<UserDto>
 public class GetUsersQueryHandler(
     IUserRepository userRepository) : IQueryHandler<GetUsersQueryRequest, ErrorOr<PaginatedResponseDto<UserDto>>>
 {
-    public ValueTask<ErrorOr<PaginatedResponseDto<UserDto>>> Handle(GetUsersQueryRequest request, CancellationToken cancellationToken)
-        => throw new NotImplementedException();
+    public async ValueTask<ErrorOr<PaginatedResponseDto<UserDto>>> Handle(GetUsersQueryRequest request, CancellationToken cancellationToken)
+    {
+        var pageRequest = PaginatedRequestDto.Create(request.Page, request.PageSize);
+        if (pageRequest.IsError)
+            return pageRequest.Errors;
+
+        var name = request.Name?.Trim();
+        var users = string.IsNullOrEmpty(name)
+            ? await userRepository.GetPaginatedUsers(pageRequest.Value, cancellationToken)
+            : await userRepository.SearchUsersByName(name, pageRequest.Value, cancellationToken);
+
+        return new PaginatedResponseDto<UserDto>([.. users.Data.Select(UserDto.FromUser)], users.PagesAvailable);
+    }
 }

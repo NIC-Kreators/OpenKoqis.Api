@@ -4,8 +4,6 @@ using OpenKoqis.Humans.Application.Dto;
 using OpenKoqis.Humans.Application.Services;
 using OpenKoqis.Shared.Application.Dto;
 
-#pragma warning disable CS9113 // Handle is not implemented yet, so the injected dependencies are unread.
-
 namespace OpenKoqis.Humans.Application.Features.Users.Queries;
 
 public class SearchIdentitiesQueryRequest : IQuery<ErrorOr<PaginatedResponseDto<IdentityDto>>>
@@ -27,6 +25,17 @@ public class SearchIdentitiesQueryHandler(
     IIdentityProvider identityProvider,
     IUserRepository userRepository) : IQueryHandler<SearchIdentitiesQueryRequest, ErrorOr<PaginatedResponseDto<IdentityDto>>>
 {
-    public ValueTask<ErrorOr<PaginatedResponseDto<IdentityDto>>> Handle(SearchIdentitiesQueryRequest request, CancellationToken cancellationToken)
-        => throw new NotImplementedException();
+    public async ValueTask<ErrorOr<PaginatedResponseDto<IdentityDto>>> Handle(SearchIdentitiesQueryRequest request, CancellationToken cancellationToken)
+    {
+        var pageRequest = PaginatedRequestDto.Create(request.Page, request.PageSize);
+        if (pageRequest.IsError)
+            return pageRequest.Errors;
+
+        var found = await identityProvider.SearchByLogin(request.Term, pageRequest.Value, cancellationToken);
+        var linkedIds = await userRepository.GetLinkedIdentityIds([.. found.Data.Select(identity => identity.Id)], cancellationToken);
+
+        return new PaginatedResponseDto<IdentityDto>(
+            [.. found.Data.Select(identity => IdentityDto.FromIdentity(identity, linkedIds.Contains(identity.Id)))],
+            found.PagesAvailable);
+    }
 }

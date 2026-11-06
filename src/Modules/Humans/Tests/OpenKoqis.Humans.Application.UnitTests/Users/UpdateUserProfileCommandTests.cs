@@ -1,6 +1,5 @@
 using AwesomeAssertions;
 using ErrorOr;
-using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using OpenKoqis.Humans.Application.Features.Users;
 using OpenKoqis.Humans.Application.Features.Users.Commands;
@@ -22,8 +21,7 @@ public class UpdateUserProfileCommandTests
 
         return new UpdateUserProfileCommandHandler(
             _unitOfWork,
-            _userRepository,
-            NullLogger<UpdateUserProfileCommandHandler>.Instance);
+            _userRepository);
     }
 
     private static UpdateUserProfileCommandRequest RequestFor(
