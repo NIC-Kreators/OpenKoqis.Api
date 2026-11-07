@@ -19,7 +19,6 @@
     <ItemGroup>
         <Folder Include="Features\Roles\Commands\" />
         <Folder Include="Features\Roles\Queries\" />
-        <Folder Include="Features\Users\Queries\" />
     </ItemGroup>
 
     <ItemGroup>

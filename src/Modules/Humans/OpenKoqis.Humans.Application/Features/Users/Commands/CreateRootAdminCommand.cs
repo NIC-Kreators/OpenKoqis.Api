@@ -134,7 +134,8 @@ public class CreateRootAdminCommandHandler(
             await RevokeIssuedTokensAsync(tokens);
 
         if (createdIdentity is not null)
-            await DeleteCreatedIdentityAsync(createdIdentity);
+            await IdentityCompensation.DeleteUnlessLinkedAsync(
+                identityProvider, userRepository, createdIdentity, "root admin creation", logger);
     }
 
     private async Task RevokeIssuedTokensAsync(TokensDto tokens)
@@ -151,41 +152,6 @@ public class CreateRootAdminCommandHandler(
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to revoke the session opened during root admin creation; it stays active until it expires");
-        }
-    }
-
-    private async Task DeleteCreatedIdentityAsync(Identity identity)
-    {
-        try
-        {
-            // The save may have committed before failing, or a concurrent run whose lock expired may have
-            // linked its root to this identity. Deleting it then would leave a user that cannot sign in.
-            if (await userRepository.IsIdentityLinked(identity.Id, CancellationToken.None))
-            {
-                logger.LogWarning(
-                    "Kept identity {IdentityId} (login {Login}) after root admin creation failed: a persisted user is linked to it",
-                    identity.Id,
-                    identity.Login.Value);
-
-                return;
-            }
-
-            var deleted = await identityProvider.Delete(identity.Id, CancellationToken.None);
-
-            if (deleted.IsError)
-                logger.LogError(
-                    "Failed to delete identity {IdentityId} (login {Login}) after root admin creation failed; it is orphaned in the identity provider. Errors: {Errors}",
-                    identity.Id,
-                    identity.Login.Value,
-                    deleted.Errors);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(
-                ex,
-                "Failed to delete identity {IdentityId} (login {Login}) after root admin creation failed; it is orphaned in the identity provider",
-                identity.Id,
-                identity.Login.Value);
         }
     }
 }
