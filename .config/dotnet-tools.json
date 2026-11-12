@@ -7,7 +7,7 @@
       "commands": [
         "husky"
       ],
-      "rollForward": false
+      "rollForward": true
     }
   }
 }
