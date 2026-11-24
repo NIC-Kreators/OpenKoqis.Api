@@ -3,216 +3,202 @@ using NSubstitute;
 using OpenKoqis.Humans.Application.Dto;
 using OpenKoqis.Humans.Application.Features.Users;
 using OpenKoqis.Humans.Application.Features.Users.Queries;
-using OpenKoqis.Humans.Domain.Users;
-using OpenKoqis.Humans.Domain.Users.Types;
+using OpenKoqis.Humans.Domain.Users.Errors;
 using OpenKoqis.Shared.Application.Dto;
-using static OpenKoqis.Humans.Application.UnitTests.Fixtures;
 
 namespace OpenKoqis.Humans.Application.UnitTests.Users;
 
 public class GetUsersQueryTests
 {
-    private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
+    private readonly IUserReadStore _store = Substitute.For<IUserReadStore>();
 
-    private GetUsersQueryHandler CreateHandler() => new(_userRepository);
+    private GetUsersQueryHandler CreateHandler() => new(_store);
 
-    private static User UserWithContacts(string login, string identityId, string fullName, string email, string phone)
-        => User.Create(new User.CreationAttributes
-        {
-            Login = LoginOf(login),
-            IdentityId = identityId,
-            Name = HumanNameOf(fullName),
-            Email = Email.Parse(email).Value,
-            PhoneNumber = PhoneNumber.Parse(phone).Value,
-            DedicatedAccess = AccessesOf("bins:read"),
-        }).Value;
-
-    private void ReturnsPage(PaginatedResponseDto<User> page)
+    private static UserDto DtoOf(string login) => new()
     {
-        _userRepository.GetPaginatedUsers(Arg.Any<PaginatedRequestDto>(), Arg.Any<CancellationToken>()).Returns(page);
-        _userRepository.SearchUsersByName(Arg.Any<string>(), Arg.Any<PaginatedRequestDto>(), Arg.Any<CancellationToken>()).Returns(page);
-    }
+        Id = Guid.NewGuid(),
+        IdentityId = $"identity-{login}",
+        Login = login,
+        FullName = "Ivan Ivanov",
+        IsRoot = false,
+        DedicatedAccess = ["bins:read"],
+    };
+
+    private void ReturnsPage(PaginatedResponseDto<UserDto> page)
+        => _store.GetUsers(Arg.Any<UserFilter>(), Arg.Any<PaginatedRequestDto>(), Arg.Any<CancellationToken>()).Returns(page);
 
     /// <summary>
-    /// Without a name filter every returned user is mapped to a <see cref="UserDto"/> with all fields, in repository order.
+    /// Without filters the store receives an empty filter and the handler returns the store's page unchanged.
     /// </summary>
     [Test]
-    public async Task Handle_NoName_ReturnsAllUsersMappedInOrderWithPagesAvailable()
+    public async Task Handle_NoFilters_QueriesStoreWithEmptyFilterAndReturnsItsPage()
     {
         // Arrange
-        var first = UserWithContacts("ivan", "identity-1", "Ivan Ivanov", "ivan@example.com", "+77011234567");
-        var second = RegularUser("petr", "identity-2");
-        _userRepository.GetPaginatedUsers(Arg.Any<PaginatedRequestDto>(), Arg.Any<CancellationToken>())
-            .Returns(new PaginatedResponseDto<User>([first, second], 7));
+        IReadOnlyList<UserDto> data = [DtoOf("ivan"), DtoOf("petr")];
+        ReturnsPage(new PaginatedResponseDto<UserDto>(data, 7));
 
         // Act
         var result = await CreateHandler().Handle(new GetUsersQueryRequest(), CancellationToken.None);
 
         // Assert
         result.IsError.Should().BeFalse();
+        result.Value.Data.Should().BeSameAs(data);
         result.Value.PagesAvailable.Should().Be(7);
-        result.Value.Data.Should().HaveCount(2);
-        result.Value.Data[0].Should().BeEquivalentTo(UserDto.FromUser(first));
-        result.Value.Data[1].Should().BeEquivalentTo(UserDto.FromUser(second));
-        result.Value.Data[0].Id.Should().Be(first.Id);
-        result.Value.Data[0].Email.Should().Be("ivan@example.com");
-        result.Value.Data[1].Id.Should().Be(second.Id);
+        await _store.Received(1).GetUsers(new UserFilter(), Arg.Any<PaginatedRequestDto>(), Arg.Any<CancellationToken>());
     }
 
     /// <summary>
-    /// The root user and regular users are mapped alike.
+    /// A search with surrounding whitespace is trimmed before it reaches the store.
     /// </summary>
     [Test]
-    public async Task Handle_RootAndRegularUsers_MapsBothAlike()
+    public async Task Handle_SearchWithSurroundingWhitespace_PassesTrimmedSearch()
     {
         // Arrange
-        var root = RootUser();
-        var regular = RegularUser("ivan", "identity-1");
-        _userRepository.GetPaginatedUsers(Arg.Any<PaginatedRequestDto>(), Arg.Any<CancellationToken>())
-            .Returns(new PaginatedResponseDto<User>([root, regular], 1));
+        ReturnsPage(new PaginatedResponseDto<UserDto>([], 0));
 
         // Act
-        var result = await CreateHandler().Handle(new GetUsersQueryRequest(), CancellationToken.None);
+        var result = await CreateHandler().Handle(new GetUsersQueryRequest { Search = "  Ivan Ivanov \t" }, CancellationToken.None);
 
         // Assert
         result.IsError.Should().BeFalse();
-        result.Value.Data.Select(d => d.Id).Should().Equal(root.Id, regular.Id);
-        result.Value.Data[0].Should().BeEquivalentTo(UserDto.FromUser(root));
-        result.Value.Data[1].Should().BeEquivalentTo(UserDto.FromUser(regular));
+        await _store.Received(1).GetUsers(
+            new UserFilter { Search = "Ivan Ivanov" },
+            Arg.Any<PaginatedRequestDto>(),
+            Arg.Any<CancellationToken>());
     }
 
     /// <summary>
-    /// A name filter searches by that name and does not use the unfiltered listing.
-    /// </summary>
-    [Test]
-    public async Task Handle_NameGiven_SearchesByNameAndSkipsUnfilteredListing()
-    {
-        // Arrange
-        var user = RegularUser("ivan", "identity-1");
-        _userRepository.SearchUsersByName("Ivan", Arg.Any<PaginatedRequestDto>(), Arg.Any<CancellationToken>())
-            .Returns(new PaginatedResponseDto<User>([user], 3));
-
-        // Act
-        var result = await CreateHandler().Handle(new GetUsersQueryRequest { Name = "Ivan" }, CancellationToken.None);
-
-        // Assert
-        result.IsError.Should().BeFalse();
-        result.Value.PagesAvailable.Should().Be(3);
-        result.Value.Data.Select(d => d.Id).Should().Equal(user.Id);
-        await _userRepository.Received(1).SearchUsersByName("Ivan", Arg.Any<PaginatedRequestDto>(), Arg.Any<CancellationToken>());
-        await _userRepository.DidNotReceive().GetPaginatedUsers(Arg.Any<PaginatedRequestDto>(), Arg.Any<CancellationToken>());
-    }
-
-    /// <summary>
-    /// A name with surrounding whitespace is trimmed before searching.
-    /// </summary>
-    [Test]
-    public async Task Handle_NameWithSurroundingSpaces_SearchesWithTrimmedName()
-    {
-        // Arrange
-        ReturnsPage(new PaginatedResponseDto<User>([], 0));
-
-        // Act
-        var result = await CreateHandler().Handle(new GetUsersQueryRequest { Name = "  Ivan Ivanov \t" }, CancellationToken.None);
-
-        // Assert
-        result.IsError.Should().BeFalse();
-        await _userRepository.Received(1).SearchUsersByName("Ivan Ivanov", Arg.Any<PaginatedRequestDto>(), Arg.Any<CancellationToken>());
-        await _userRepository.DidNotReceive().GetPaginatedUsers(Arg.Any<PaginatedRequestDto>(), Arg.Any<CancellationToken>());
-    }
-
-    /// <summary>
-    /// A null, empty or whitespace name lists users without filtering and never searches.
+    /// A null, empty or whitespace search reaches the store as no search.
     /// </summary>
     [Test]
     [Arguments(null)]
     [Arguments("")]
     [Arguments("   ")]
-    public async Task Handle_BlankName_ListsUnfilteredAndSkipsSearch(string? name)
+    public async Task Handle_BlankSearch_PassesNoSearch(string? search)
     {
         // Arrange
-        var user = RegularUser("ivan", "identity-1");
-        _userRepository.GetPaginatedUsers(Arg.Any<PaginatedRequestDto>(), Arg.Any<CancellationToken>())
-            .Returns(new PaginatedResponseDto<User>([user], 2));
+        ReturnsPage(new PaginatedResponseDto<UserDto>([], 0));
 
         // Act
-        var result = await CreateHandler().Handle(new GetUsersQueryRequest { Name = name }, CancellationToken.None);
+        var result = await CreateHandler().Handle(new GetUsersQueryRequest { Search = search }, CancellationToken.None);
 
         // Assert
         result.IsError.Should().BeFalse();
-        result.Value.Data.Select(d => d.Id).Should().Equal(user.Id);
-        await _userRepository.Received(1).GetPaginatedUsers(Arg.Any<PaginatedRequestDto>(), Arg.Any<CancellationToken>());
-        await _userRepository.DidNotReceive().SearchUsersByName(Arg.Any<string>(), Arg.Any<PaginatedRequestDto>(), Arg.Any<CancellationToken>());
+        await _store.Received(1).GetUsers(
+            Arg.Is<UserFilter>(f => f.Search == null),
+            Arg.Any<PaginatedRequestDto>(),
+            Arg.Any<CancellationToken>());
     }
 
     /// <summary>
-    /// Without a name filter the requested page and page size reach the unfiltered listing.
+    /// A role id reaches the store in the filter.
     /// </summary>
     [Test]
-    public async Task Handle_NoName_PassesPagingToUnfilteredListing()
+    public async Task Handle_RoleIdGiven_PassesRoleIdInFilter()
     {
         // Arrange
-        _userRepository.GetPaginatedUsers(Arg.Any<PaginatedRequestDto>(), Arg.Any<CancellationToken>())
-            .Returns(new PaginatedResponseDto<User>([], 0));
+        var roleId = Guid.NewGuid();
+        ReturnsPage(new PaginatedResponseDto<UserDto>([], 0));
+
+        // Act
+        var result = await CreateHandler().Handle(new GetUsersQueryRequest { RoleId = roleId }, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        await _store.Received(1).GetUsers(
+            new UserFilter { RoleId = roleId },
+            Arg.Any<PaginatedRequestDto>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// The deleted flag reaches the store in the filter.
+    /// </summary>
+    [Test]
+    public async Task Handle_IsDeleted_PassesIsDeletedInFilter()
+    {
+        // Arrange
+        ReturnsPage(new PaginatedResponseDto<UserDto>([], 0));
+
+        // Act
+        var result = await CreateHandler().Handle(new GetUsersQueryRequest { IsDeleted = true }, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        await _store.Received(1).GetUsers(
+            new UserFilter { IsDeleted = true },
+            Arg.Any<PaginatedRequestDto>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// Search, role id and the deleted flag all reach the store in one filter.
+    /// </summary>
+    [Test]
+    public async Task Handle_AllFiltersGiven_PassesAllInOneFilter()
+    {
+        // Arrange
+        var roleId = Guid.NewGuid();
+        ReturnsPage(new PaginatedResponseDto<UserDto>([], 0));
+        var request = new GetUsersQueryRequest { Search = " Ivan ", RoleId = roleId, IsDeleted = true };
+
+        // Act
+        var result = await CreateHandler().Handle(request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        await _store.Received(1).GetUsers(
+            new UserFilter { Search = "Ivan", RoleId = roleId, IsDeleted = true },
+            Arg.Any<PaginatedRequestDto>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// The requested page and page size reach the store.
+    /// </summary>
+    [Test]
+    public async Task Handle_PagingGiven_PassesPageAndPageSizeToStore()
+    {
+        // Arrange
+        ReturnsPage(new PaginatedResponseDto<UserDto>([], 0));
 
         // Act
         var result = await CreateHandler().Handle(new GetUsersQueryRequest { Page = 3, PageSize = 50 }, CancellationToken.None);
 
         // Assert
         result.IsError.Should().BeFalse();
-        await _userRepository.Received(1).GetPaginatedUsers(
+        await _store.Received(1).GetUsers(
+            Arg.Any<UserFilter>(),
             Arg.Is<PaginatedRequestDto>(p => p.Page == 3 && p.PageSize == 50),
             Arg.Any<CancellationToken>());
     }
 
     /// <summary>
-    /// With a name filter the requested page and page size reach the search.
+    /// An empty role id is rejected with an empty-role-id error and the store is not called.
     /// </summary>
     [Test]
-    public async Task Handle_NameGiven_PassesPagingToSearch()
+    public async Task Handle_EmptyRoleId_ReturnsEmptyRoleIdErrorAndSkipsStore()
     {
         // Arrange
-        _userRepository.SearchUsersByName(Arg.Any<string>(), Arg.Any<PaginatedRequestDto>(), Arg.Any<CancellationToken>())
-            .Returns(new PaginatedResponseDto<User>([], 0));
+        var request = new GetUsersQueryRequest { RoleId = Guid.Empty };
 
         // Act
-        var result = await CreateHandler().Handle(new GetUsersQueryRequest { Name = "Ivan", Page = 4, PageSize = 15 }, CancellationToken.None);
+        var result = await CreateHandler().Handle(request, CancellationToken.None);
 
         // Assert
-        result.IsError.Should().BeFalse();
-        await _userRepository.Received(1).SearchUsersByName(
-            "Ivan",
-            Arg.Is<PaginatedRequestDto>(p => p.Page == 4 && p.PageSize == 15),
-            Arg.Any<CancellationToken>());
+        result.IsError.Should().BeTrue();
+        result.Errors.Select(e => e.Code).Should().Contain(UserErrors.EmptyRoleId.Code);
+        await _store.DidNotReceiveWithAnyArgs().GetUsers(default!, default, default);
     }
 
     /// <summary>
-    /// An empty page returns empty data and the repository's pages-available count.
+    /// Page 0 is rejected with a page-zero error and the store is not called.
     /// </summary>
     [Test]
-    public async Task Handle_EmptyPage_ReturnsEmptyDataWithPagesAvailable()
+    public async Task Handle_PageZero_ReturnsPageZeroErrorAndSkipsStore()
     {
         // Arrange
-        _userRepository.GetPaginatedUsers(Arg.Any<PaginatedRequestDto>(), Arg.Any<CancellationToken>())
-            .Returns(new PaginatedResponseDto<User>([], 5));
-
-        // Act
-        var result = await CreateHandler().Handle(new GetUsersQueryRequest { Page = 9 }, CancellationToken.None);
-
-        // Assert
-        result.IsError.Should().BeFalse();
-        result.Value.Data.Should().BeEmpty();
-        result.Value.PagesAvailable.Should().Be(5);
-    }
-
-    /// <summary>
-    /// Page 0 is rejected with a page-zero error and the repository is not called.
-    /// </summary>
-    [Test]
-    public async Task Handle_PageZero_ReturnsPageZeroErrorAndSkipsRepository()
-    {
-        // Arrange
-        var request = new GetUsersQueryRequest { Name = "Ivan", Page = 0, PageSize = 10 };
+        var request = new GetUsersQueryRequest { Search = "Ivan", Page = 0, PageSize = 10 };
 
         // Act
         var result = await CreateHandler().Handle(request, CancellationToken.None);
@@ -220,15 +206,14 @@ public class GetUsersQueryTests
         // Assert
         result.IsError.Should().BeTrue();
         result.Errors.Select(e => e.Code).Should().Contain("PaginatedRequest.PageZero");
-        await _userRepository.DidNotReceiveWithAnyArgs().SearchUsersByName(default!, default, default);
-        await _userRepository.DidNotReceiveWithAnyArgs().GetPaginatedUsers(default, default);
+        await _store.DidNotReceiveWithAnyArgs().GetUsers(default!, default, default);
     }
 
     /// <summary>
-    /// Page size 0 is rejected with an out-of-range error and the repository is not called.
+    /// Page size 0 is rejected with an out-of-range error and the store is not called.
     /// </summary>
     [Test]
-    public async Task Handle_PageSizeZero_ReturnsPageSizeErrorAndSkipsRepository()
+    public async Task Handle_PageSizeZero_ReturnsPageSizeErrorAndSkipsStore()
     {
         // Arrange
         var request = new GetUsersQueryRequest { Page = 1, PageSize = 0 };
@@ -239,15 +224,14 @@ public class GetUsersQueryTests
         // Assert
         result.IsError.Should().BeTrue();
         result.Errors.Select(e => e.Code).Should().Contain("PaginatedRequest.PageSizeOutOfRange");
-        await _userRepository.DidNotReceiveWithAnyArgs().SearchUsersByName(default!, default, default);
-        await _userRepository.DidNotReceiveWithAnyArgs().GetPaginatedUsers(default, default);
+        await _store.DidNotReceiveWithAnyArgs().GetUsers(default!, default, default);
     }
 
     /// <summary>
-    /// A page size above the maximum is rejected with an out-of-range error and the repository is not called.
+    /// A page size above the maximum is rejected with an out-of-range error and the store is not called.
     /// </summary>
     [Test]
-    public async Task Handle_PageSizeOverMax_ReturnsPageSizeErrorAndSkipsRepository()
+    public async Task Handle_PageSizeOverMax_ReturnsPageSizeErrorAndSkipsStore()
     {
         // Arrange
         var request = new GetUsersQueryRequest { Page = 1, PageSize = PaginatedRequestDto.MaxPageSize + 1 };
@@ -258,7 +242,43 @@ public class GetUsersQueryTests
         // Assert
         result.IsError.Should().BeTrue();
         result.Errors.Select(e => e.Code).Should().Contain("PaginatedRequest.PageSizeOutOfRange");
-        await _userRepository.DidNotReceiveWithAnyArgs().SearchUsersByName(default!, default, default);
-        await _userRepository.DidNotReceiveWithAnyArgs().GetPaginatedUsers(default, default);
+        await _store.DidNotReceiveWithAnyArgs().GetUsers(default!, default, default);
+    }
+
+    /// <summary>
+    /// Invalid paging and an empty role id are reported together and the store is not called.
+    /// </summary>
+    [Test]
+    public async Task Handle_PageZeroAndEmptyRoleId_ReturnsBothErrorsAndSkipsStore()
+    {
+        // Arrange
+        var request = new GetUsersQueryRequest { RoleId = Guid.Empty, Page = 0 };
+
+        // Act
+        var result = await CreateHandler().Handle(request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeTrue();
+        result.Errors.Select(e => e.Code).Should().Contain("PaginatedRequest.PageZero")
+            .And.Contain(UserErrors.EmptyRoleId.Code);
+        await _store.DidNotReceiveWithAnyArgs().GetUsers(default!, default, default);
+    }
+
+    /// <summary>
+    /// An empty page returns empty data and the store's pages-available count.
+    /// </summary>
+    [Test]
+    public async Task Handle_EmptyPage_ReturnsEmptyDataWithPagesAvailable()
+    {
+        // Arrange
+        ReturnsPage(new PaginatedResponseDto<UserDto>([], 5));
+
+        // Act
+        var result = await CreateHandler().Handle(new GetUsersQueryRequest { Page = 9 }, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        result.Value.Data.Should().BeEmpty();
+        result.Value.PagesAvailable.Should().Be(5);
     }
 }

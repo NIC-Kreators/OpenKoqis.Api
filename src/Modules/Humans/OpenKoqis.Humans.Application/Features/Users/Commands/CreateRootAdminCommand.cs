@@ -112,7 +112,7 @@ public class CreateRootAdminCommandHandler(
 
             return new CreateRootAdminCommandResponse
             {
-                User = UserDto.FromUser(user.Value),
+                User = UserDto.FromUser(user.Value, role: null),
                 Tokens = tokens.Value,
             };
         }

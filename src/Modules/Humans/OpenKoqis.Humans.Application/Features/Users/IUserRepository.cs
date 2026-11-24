@@ -1,30 +1,24 @@
 using OpenKoqis.Humans.Application.Persistence;
 using OpenKoqis.Humans.Domain.Users;
-using OpenKoqis.Shared.Application.Dto;
 
 namespace OpenKoqis.Humans.Application.Features.Users;
 
 /// <summary>
-/// Persisted users of the Humans module. Users returned by this repository are tracked: changes made to them are
-/// persisted when <see cref="IHumansUnitOfWork"/> saves changes.
+/// Persisted users of the Humans module, loaded for use cases that change them. Users returned by this repository
+/// are tracked: changes made to them are persisted when <see cref="IHumansUnitOfWork"/> saves changes. Query results
+/// come from <see cref="IUserReadStore"/> instead.
 /// </summary>
 public interface IUserRepository
 {
     /// <summary>
-    /// Returns a page of the users whose full name contains <paramref name="name"/>, case-insensitively.
-    /// Soft-deleted users are excluded; users are ordered by creation, oldest first.
-    /// </summary>
-    Task<PaginatedResponseDto<User>> SearchUsersByName(string name, PaginatedRequestDto paginatedRequest = default, CancellationToken ct = default);
-
-    /// <summary>
-    /// Returns a page of all users. Soft-deleted users are excluded; users are ordered by creation, oldest first.
-    /// </summary>
-    Task<PaginatedResponseDto<User>> GetPaginatedUsers(PaginatedRequestDto pageRequest = default, CancellationToken ct = default);
-
-    /// <summary>
     /// Returns the user with the given <paramref name="id"/>; <c>null</c> when there is none or it is soft-deleted.
     /// </summary>
     Task<User?> GetUserWithId(Guid id, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the user with the given <paramref name="id"/>, soft-deleted or not; <c>null</c> when there is none.
+    /// </summary>
+    Task<User?> GetUserWithIdIncludingDeleted(Guid id, CancellationToken ct = default);
 
     /// <summary>
     /// Whether a root user is already persisted.

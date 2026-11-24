@@ -1,6 +1,7 @@
 using ErrorOr;
 using Mediator;
 using OpenKoqis.Humans.Application.Dto;
+using OpenKoqis.Humans.Domain.Users.Errors;
 using OpenKoqis.Shared.Application.Dto;
 
 namespace OpenKoqis.Humans.Application.Features.Users.Queries;
@@ -8,31 +9,51 @@ namespace OpenKoqis.Humans.Application.Features.Users.Queries;
 public class GetUsersQueryRequest : IQuery<ErrorOr<PaginatedResponseDto<UserDto>>>
 {
     /// <summary>
-    /// Part of the full name to filter by; <c>null</c>, empty or whitespace returns every user.
+    /// Text the full name, login, email or phone number contains; <c>null</c>, empty or whitespace matches every user.
     /// </summary>
-    public string? Name { get; init; }
+    public string? Search { get; init; }
+
+    /// <summary>
+    /// Returns only the users assigned to this role; <c>null</c> matches every user.
+    /// </summary>
+    public Guid? RoleId { get; init; }
+
+    /// <summary>
+    /// <c>false</c> returns active users, <c>true</c> only soft-deleted ones.
+    /// </summary>
+    public bool IsDeleted { get; init; }
 
     public uint Page { get; init; } = 1;
     public uint PageSize { get; init; } = PaginatedRequestDto.DefaultPageSize;
 }
 
 /// <summary>
-/// Returns a page of users, optionally filtered by name. Soft-deleted users are not returned.
+/// Returns a page of users matching the request's filters.
 /// </summary>
 public class GetUsersQueryHandler(
-    IUserRepository userRepository) : IQueryHandler<GetUsersQueryRequest, ErrorOr<PaginatedResponseDto<UserDto>>>
+    IUserReadStore userReadStore) : IQueryHandler<GetUsersQueryRequest, ErrorOr<PaginatedResponseDto<UserDto>>>
 {
     public async ValueTask<ErrorOr<PaginatedResponseDto<UserDto>>> Handle(GetUsersQueryRequest request, CancellationToken cancellationToken)
     {
         var pageRequest = PaginatedRequestDto.Create(request.Page, request.PageSize);
-        if (pageRequest.IsError)
-            return pageRequest.Errors;
 
-        var name = request.Name?.Trim();
-        var users = string.IsNullOrEmpty(name)
-            ? await userRepository.GetPaginatedUsers(pageRequest.Value, cancellationToken)
-            : await userRepository.SearchUsersByName(name, pageRequest.Value, cancellationToken);
+        List<Error> inputErrors = [.. pageRequest.ErrorsOrEmptyList];
 
-        return new PaginatedResponseDto<UserDto>([.. users.Data.Select(UserDto.FromUser)], users.PagesAvailable);
+        if (request.RoleId == Guid.Empty)
+            inputErrors.Add(UserErrors.EmptyRoleId);
+
+        if (inputErrors.Count is not 0)
+            return inputErrors;
+
+        var search = request.Search?.Trim();
+
+        var filter = new UserFilter
+        {
+            Search = string.IsNullOrEmpty(search) ? null : search,
+            RoleId = request.RoleId,
+            IsDeleted = request.IsDeleted,
+        };
+
+        return await userReadStore.GetUsers(filter, pageRequest.Value, cancellationToken);
     }
 }

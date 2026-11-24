@@ -1,9 +1,11 @@
 using AwesomeAssertions;
 using ErrorOr;
 using NSubstitute;
+using OpenKoqis.Humans.Application.Features.Roles;
 using OpenKoqis.Humans.Application.Features.Users;
 using OpenKoqis.Humans.Application.Features.Users.Commands;
 using OpenKoqis.Humans.Application.Persistence;
+using OpenKoqis.Humans.Domain.Roles;
 using OpenKoqis.Humans.Domain.Users;
 using OpenKoqis.Humans.Domain.Users.Types;
 using static OpenKoqis.Humans.Application.UnitTests.Fixtures;
@@ -14,6 +16,7 @@ public class UpdateUserProfileCommandTests
 {
     private readonly IHumansUnitOfWork _unitOfWork = Substitute.For<IHumansUnitOfWork>();
     private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
+    private readonly IRoleRepository _roleRepository = Substitute.For<IRoleRepository>();
 
     private UpdateUserProfileCommandHandler CreateHandler()
     {
@@ -21,7 +24,8 @@ public class UpdateUserProfileCommandTests
 
         return new UpdateUserProfileCommandHandler(
             _unitOfWork,
-            _userRepository);
+            _userRepository,
+            _roleRepository);
     }
 
     private static UpdateUserProfileCommandRequest RequestFor(
@@ -327,5 +331,79 @@ public class UpdateUserProfileCommandTests
         root.PhoneNumber!.Value.Should().Be("+77011234567");
         result.Value.User.FullName.Should().Be("Petr Petrov");
         await _unitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// A user with a role gets the role loaded by its id, and the response carries the role's name.
+    /// </summary>
+    [Test]
+    public async Task Handle_UserWithRole_ReturnsRoleName()
+    {
+        // Arrange
+        var role = RoleWith("bins:read");
+        var user = GivenExisting(User.Create(new User.CreationAttributes
+        {
+            Login = LoginOf(),
+            IdentityId = "identity-1",
+            Name = HumanNameOf(),
+            RoleId = role.Id,
+            DedicatedAccess = AccessesOf("bins:read"),
+        }).Value);
+        _roleRepository.GetRoleWithId(role.Id, Arg.Any<CancellationToken>()).Returns(role);
+        var handler = CreateHandler();
+
+        // Act
+        var result = await handler.Handle(RequestFor(user.Id), CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        await _roleRepository.Received(1).GetRoleWithId(role.Id, Arg.Any<CancellationToken>());
+        result.Value.User.RoleName.Should().Be(role.Name);
+    }
+
+    /// <summary>
+    /// A role id that points to no role anymore yields a null role name and no error.
+    /// </summary>
+    [Test]
+    public async Task Handle_UserWithDanglingRoleId_ReturnsNullRoleName()
+    {
+        // Arrange
+        var roleId = Guid.NewGuid();
+        var user = GivenExisting(User.Create(new User.CreationAttributes
+        {
+            Login = LoginOf(),
+            IdentityId = "identity-1",
+            Name = HumanNameOf(),
+            RoleId = roleId,
+            DedicatedAccess = AccessesOf("bins:read"),
+        }).Value);
+        _roleRepository.GetRoleWithId(roleId, Arg.Any<CancellationToken>()).Returns((Role?)null);
+        var handler = CreateHandler();
+
+        // Act
+        var result = await handler.Handle(RequestFor(user.Id), CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        result.Value.User.RoleName.Should().BeNull();
+    }
+
+    /// <summary>
+    /// A user without a role is not looked up in the role repository and has a null role name.
+    /// </summary>
+    [Test]
+    public async Task Handle_UserWithoutRole_DoesNotLoadRoleAndReturnsNullRoleName()
+    {
+        // Arrange
+        var user = GivenExisting(UserWithContacts());
+        var handler = CreateHandler();
+
+        // Act
+        var result = await handler.Handle(RequestFor(user.Id), CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        await _roleRepository.DidNotReceive().GetRoleWithId(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        result.Value.User.RoleName.Should().BeNull();
     }
 }

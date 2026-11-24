@@ -195,6 +195,21 @@ public class User : Entity<Guid>
     }
 
     /// <summary>
+    /// Brings back a soft-deleted user by clearing <see cref="DeletedAt"/>. Fails with
+    /// <see cref="UserErrors.NotDeleted"/> when the user is not deleted.
+    /// </summary>
+    public ErrorOr<Updated> Restore()
+    {
+        if (DeletedAt is null)
+            return UserErrors.NotDeleted;
+
+        DeletedAt = null;
+        UpdatedAt = DateTime.UtcNow;
+
+        return Result.Updated;
+    }
+
+    /// <summary>
     /// Soft-deletes the user by setting <see cref="DeletedAt"/>; the record is purged after the retention window.
     /// Fails with <see cref="UserErrors.RootCannotBeDeleted"/> for the root and with
     /// <see cref="UserErrors.AlreadyDeleted"/> when the user is already deleted.

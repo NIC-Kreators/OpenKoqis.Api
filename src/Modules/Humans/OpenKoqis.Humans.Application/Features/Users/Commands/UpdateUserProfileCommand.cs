@@ -1,6 +1,7 @@
 using ErrorOr;
 using Mediator;
 using OpenKoqis.Humans.Application.Dto;
+using OpenKoqis.Humans.Application.Features.Roles;
 using OpenKoqis.Humans.Application.Features.Users.Errors;
 using OpenKoqis.Humans.Application.Persistence;
 using OpenKoqis.Humans.Domain.Users.Types;
@@ -29,7 +30,8 @@ public record UpdateUserProfileCommandResponse
 /// </summary>
 public class UpdateUserProfileCommandHandler(
     IHumansUnitOfWork unitOfWork,
-    IUserRepository userRepository) : ICommandHandler<UpdateUserProfileCommandRequest, ErrorOr<UpdateUserProfileCommandResponse>>
+    IUserRepository userRepository,
+    IRoleRepository roleRepository) : ICommandHandler<UpdateUserProfileCommandRequest, ErrorOr<UpdateUserProfileCommandResponse>>
 {
     public async ValueTask<ErrorOr<UpdateUserProfileCommandResponse>> Handle(UpdateUserProfileCommandRequest request, CancellationToken cancellationToken)
     {
@@ -72,6 +74,10 @@ public class UpdateUserProfileCommandHandler(
         if (saved.IsError)
             return saved.Errors;
 
-        return new UpdateUserProfileCommandResponse { User = UserDto.FromUser(user) };
+        var role = user.RoleId is { } roleId
+            ? await roleRepository.GetRoleWithId(roleId, cancellationToken)
+            : null;
+
+        return new UpdateUserProfileCommandResponse { User = UserDto.FromUser(user, role) };
     }
 }

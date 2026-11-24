@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using ErrorOr;
 using OpenKoqis.Humans.Domain.Users;
+using OpenKoqis.Humans.Domain.Users.Errors;
 using OpenKoqis.Humans.Domain.Users.Types;
 using static OpenKoqis.Humans.Domain.UnitTests.Fixtures;
 
@@ -446,5 +447,66 @@ public class UserLifecycleTests
         // Assert
         firstDeletedAt.Should().NotBeNull();
         user.DeletedAt.Should().Be(firstDeletedAt);
+    }
+
+    /// <summary>
+    /// Restoring a deleted user succeeds, clears DeletedAt and moves UpdatedAt forward.
+    /// </summary>
+    [Test]
+    public void Restore_DeletedUser_ReturnsUpdatedAndClearsDeletedAt()
+    {
+        // Arrange
+        var user = CreateUser();
+        user.Delete();
+        var updatedAtAfterDelete = user.UpdatedAt;
+
+        // Act
+        var result = user.Restore();
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        result.Value.Should().Be(Result.Updated);
+        user.DeletedAt.Should().BeNull();
+        user.UpdatedAt.Should().BeOnOrAfter(updatedAtAfterDelete);
+    }
+
+    /// <summary>
+    /// Restoring a user that was never deleted fails with <c>User.NotDeleted</c> and changes nothing.
+    /// </summary>
+    [Test]
+    public void Restore_ActiveUser_ReturnsNotDeletedAndChangesNothing()
+    {
+        // Arrange
+        var user = CreateUser();
+        var updatedAtBefore = user.UpdatedAt;
+
+        // Act
+        var result = user.Restore();
+
+        // Assert
+        result.IsError.Should().BeTrue();
+        result.Errors.Select(e => e.Code).Should().Equal(UserErrors.NotDeleted.Code);
+        user.DeletedAt.Should().BeNull();
+        user.UpdatedAt.Should().Be(updatedAtBefore);
+    }
+
+    /// <summary>
+    /// A restored user can be deleted again, which sets DeletedAt anew.
+    /// </summary>
+    [Test]
+    public void Delete_RestoredUser_ReturnsDeletedAndSetsDeletedAt()
+    {
+        // Arrange
+        var user = CreateUser();
+        user.Delete();
+        user.Restore();
+
+        // Act
+        var result = user.Delete();
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        result.Value.Should().Be(Result.Deleted);
+        user.DeletedAt.Should().NotBeNull();
     }
 }

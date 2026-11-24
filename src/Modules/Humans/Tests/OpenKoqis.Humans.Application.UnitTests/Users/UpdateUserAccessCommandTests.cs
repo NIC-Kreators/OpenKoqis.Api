@@ -86,7 +86,7 @@ public class UpdateUserAccessCommandTests
         user.RoleId.Should().Be(role.Id);
         user.DedicatedAccess.Should().BeEquivalentTo(AccessesOf("users:write", "reports:read"));
         result.Value.User.RoleId.Should().Be(role.Id);
-        result.Value.User.DedicatedAccess.Should().BeEquivalentTo(UserDto.FromUser(user).DedicatedAccess);
+        result.Value.User.DedicatedAccess.Should().BeEquivalentTo(UserDto.FromUser(user, role).DedicatedAccess);
         await _unitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
         await _accessProjection.Received(1).UserAccessChanged(user, role, Arg.Any<CancellationToken>());
     }
@@ -351,5 +351,49 @@ public class UpdateUserAccessCommandTests
         error.Type.Should().Be(ErrorType.Failure);
         error.Metadata.Should().ContainKey(UserFeatureErrors.UserIdMetadataKey);
         error.Metadata![UserFeatureErrors.UserIdMetadataKey].Should().Be(user.Id);
+    }
+
+    /// <summary>
+    /// The response carries the name of the role that was assigned.
+    /// </summary>
+    [Test]
+    public async Task Handle_RequestWithRole_ReturnsAssignedRoleName()
+    {
+        // Arrange
+        var user = RegularUser(dedicatedAccess: "bins:read");
+        var role = RoleWith("bins:read");
+        SetupUser(user);
+        SetupRole(role);
+        SetupSaveSucceeds();
+        SetupProjectionSucceeds();
+        var request = RequestFor(user.Id, role.Id, "users:write");
+
+        // Act
+        var result = await CreateHandler().Handle(request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        result.Value.User.RoleName.Should().Be(role.Name);
+    }
+
+    /// <summary>
+    /// Clearing the role leaves the response without a role name.
+    /// </summary>
+    [Test]
+    public async Task Handle_RoleCleared_ReturnsNullRoleName()
+    {
+        // Arrange
+        var user = RegularUser(roleId: Guid.NewGuid(), dedicatedAccess: "bins:read");
+        SetupUser(user);
+        SetupSaveSucceeds();
+        SetupProjectionSucceeds();
+        var request = RequestFor(user.Id, null, "users:write");
+
+        // Act
+        var result = await CreateHandler().Handle(request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        result.Value.User.RoleName.Should().BeNull();
     }
 }

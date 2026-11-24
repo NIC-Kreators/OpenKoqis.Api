@@ -23,8 +23,9 @@ public class CreateUserCommandRequest : ICommand<ErrorOr<CreateUserCommandRespon
     public required string FullName { get; init; }
 
     /// <summary>
-    /// Password of the identity to create. Required and non-blank when no identity with <see cref="Login"/> exists;
-    /// must be <c>null</c> when one does — any string, a blank one included, is rejected then.
+    /// Password of the identity to create or enable. Required and non-blank when no identity with
+    /// <see cref="Login"/> exists or the existing one is disabled; must be <c>null</c> when the existing one is
+    /// enabled — any string, a blank one included, is rejected then.
     /// </summary>
     public string? Password { get; init; }
 
@@ -46,8 +47,11 @@ public record CreateUserCommandResponse
 /// <summary>
 /// Creates a regular user linked to the identity with the given login. When no such identity exists and
 /// <see cref="HumansOptions.IsIdentityCreationAllowed"/> is set, the identity is created first; if the user is then
-/// not saved, that identity is deleted again unless a persisted user is linked to it. After the user is saved, its
-/// access is pushed through <see cref="IAccessProjection"/>.
+/// not saved, that identity is deleted again unless a persisted user is linked to it. An existing identity that is
+/// disabled is given the request's password and enabled when <see cref="HumansOptions.IsIdentityCreationAllowed"/>
+/// is set, and fails with <see cref="IdentityErrors.Disabled(Login)"/> otherwise; if the user is then not saved, the
+/// identity is disabled again and never deleted. After the user is saved, its access is pushed through
+/// <see cref="IAccessProjection"/>.
 /// </summary>
 public class CreateUserCommandHandler(
     IHumansUnitOfWork unitOfWork,
@@ -97,6 +101,7 @@ public class CreateUserCommandHandler(
         }
 
         Identity? createdIdentity = null;
+        string? enabledIdentityId = null;
         var isCommitted = false;
 
         try
@@ -123,8 +128,31 @@ public class CreateUserCommandHandler(
                 if (await userRepository.IsIdentityLinked(identity.Id, cancellationToken))
                     return UserErrors.IdentityAlreadyLinked(identity.Id);
 
-                if (request.Password is not null)
-                    return UserFeatureErrors.PasswordNotAllowedForExistingIdentity;
+                if (identity.IsEnabled)
+                {
+                    if (request.Password is not null)
+                        return UserFeatureErrors.PasswordNotAllowedForExistingIdentity;
+                }
+                else
+                {
+                    if (!options.CurrentValue.IsIdentityCreationAllowed)
+                        return IdentityErrors.Disabled(login);
+
+                    if (string.IsNullOrWhiteSpace(request.Password))
+                        return IdentityErrors.EmptyPassword;
+
+                    var passwordSet = await identityProvider.SetPassword(identity.Id, request.Password, cancellationToken);
+
+                    if (passwordSet.IsError)
+                        return passwordSet.Errors;
+
+                    var enabled = await identityProvider.SetEnabled(identity.Id, true, cancellationToken);
+
+                    if (enabled.IsError)
+                        return enabled.Errors;
+
+                    enabledIdentityId = identity.Id;
+                }
             }
 
             var user = User.Create(new User.CreationAttributes
@@ -153,13 +181,52 @@ public class CreateUserCommandHandler(
             if (!await TryProjectAccessAsync(user.Value, role, cancellationToken))
                 return UserFeatureErrors.AccessProjectionFailed(user.Value.Id);
 
-            return new CreateUserCommandResponse { User = UserDto.FromUser(user.Value) };
+            return new CreateUserCommandResponse { User = UserDto.FromUser(user.Value, role) };
         }
         finally
         {
             if (!isCommitted && createdIdentity is not null)
                 await IdentityCompensation.DeleteUnlessLinkedAsync(
                     identityProvider, userRepository, createdIdentity, "user creation", logger);
+
+            if (!isCommitted && enabledIdentityId is not null)
+                await DisableUnlessLinkedAsync(enabledIdentityId);
+        }
+    }
+
+    /// <summary>
+    /// Disables the identity again after a creation that was not saved, unless a persisted user is linked to it: the
+    /// save may have committed before failing, or a concurrent run may have linked its user to the same identity, and
+    /// disabling it then would leave a user that cannot sign in. Uses <see cref="CancellationToken.None"/> so it
+    /// completes even when the request was cancelled, and never throws, so it cannot replace the original failure.
+    /// </summary>
+    private async Task DisableUnlessLinkedAsync(string identityId)
+    {
+        try
+        {
+            if (await userRepository.IsIdentityLinked(identityId, CancellationToken.None))
+            {
+                logger.LogWarning(
+                    "Kept identity {IdentityId} enabled after user creation failed: a persisted user is linked to it",
+                    identityId);
+
+                return;
+            }
+
+            var disabled = await identityProvider.SetEnabled(identityId, false, CancellationToken.None);
+
+            if (disabled.IsError)
+                logger.LogError(
+                    "Failed to disable identity {IdentityId} again after user creation failed; it stays enabled in the identity provider. Errors: {Errors}",
+                    identityId,
+                    disabled.Errors);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex,
+                "Failed to disable identity {IdentityId} again after user creation failed; it stays enabled in the identity provider",
+                identityId);
         }
     }
 

@@ -102,7 +102,7 @@ public class UpdateUserAccessCommandHandler(
         if (!await TryProjectAsync(user, role, cancellationToken))
             return UserFeatureErrors.AccessProjectionFailed(user.Id);
 
-        return new UpdateUserAccessCommandResponse { User = UserDto.FromUser(user) };
+        return new UpdateUserAccessCommandResponse { User = UserDto.FromUser(user, role) };
     }
 
     private async Task<bool> TryProjectAsync(User user, Role? role, CancellationToken cancellationToken)

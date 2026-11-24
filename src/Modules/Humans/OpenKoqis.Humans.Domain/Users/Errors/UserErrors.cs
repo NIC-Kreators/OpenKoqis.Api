@@ -31,6 +31,10 @@ public static class UserErrors
         code: "User.AlreadyDeleted",
         description: "The user is already deleted.");
 
+    public static Error NotDeleted => Error.Conflict(
+        code: "User.NotDeleted",
+        description: "The user is not deleted.");
+
     /// <summary>
     /// Another persisted user, soft-deleted ones included, is already linked to the same identity.
     /// </summary>

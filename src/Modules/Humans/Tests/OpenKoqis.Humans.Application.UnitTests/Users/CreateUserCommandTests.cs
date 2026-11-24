@@ -9,8 +9,10 @@ using OpenKoqis.Humans.Application.Features.Users.Commands;
 using OpenKoqis.Humans.Application.Features.Users.Errors;
 using OpenKoqis.Humans.Application.Persistence;
 using OpenKoqis.Humans.Application.Services;
+using OpenKoqis.Humans.Application.Services.Errors;
 using OpenKoqis.Humans.Domain.Roles;
 using OpenKoqis.Humans.Domain.Users;
+using OpenKoqis.Humans.Domain.Users.Errors;
 using OpenKoqis.Humans.Domain.Users.Types;
 using static OpenKoqis.Humans.Application.UnitTests.Fixtures;
 
@@ -85,6 +87,28 @@ public class CreateUserCommandTests
         var role = RoleWith("bins:write");
         _roleRepository.GetRoleWithId(role.Id, Arg.Any<CancellationToken>()).Returns(role);
         return role;
+    }
+
+    private Identity GivenDisabledIdentity(string id = "identity-disabled")
+    {
+        var identity = IdentityOf("ivan", id, isEnabled: false);
+        _identityProvider.FindByLogin(Arg.Any<Login>(), Arg.Any<CancellationToken>()).Returns(identity);
+        _identityProvider.SetPassword(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success.ToErrorOr());
+        _identityProvider.SetEnabled(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success.ToErrorOr());
+        return identity;
+    }
+
+    private async Task AssertNoIdentityMutations()
+    {
+        await _identityProvider.DidNotReceive().Create(
+            Arg.Any<Login>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _identityProvider.DidNotReceive().SetPassword(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _identityProvider.DidNotReceive().SetEnabled(
+            Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
+        await _identityProvider.DidNotReceive().Delete(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     private void AssertNothingWritten()
@@ -805,6 +829,344 @@ public class CreateUserCommandTests
         dto.PhoneNumber.Should().Be(ValidPhone);
         dto.RoleId.Should().Be(role.Id);
         dto.DedicatedAccess.Should().BeEquivalentTo(["bins:read", "reports:write"]);
+    }
+
+    /// <summary>
+    /// A disabled identity cannot be enabled when identity creation is not allowed: the call fails with
+    /// Identity.Disabled and neither the provider is changed nor anything is added or saved.
+    /// </summary>
+    [Test]
+    public async Task Handle_DisabledIdentityAndCreationNotAllowed_ReturnsDisabledAndChangesNothing()
+    {
+        // Arrange
+        GivenDisabledIdentity();
+        var handler = CreateHandler(isIdentityCreationAllowed: false);
+
+        // Act
+        var result = await handler.Handle(ValidRequest(), CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeTrue();
+        result.Errors.Select(e => e.Code).Should().Contain(IdentityErrors.Disabled(LoginOf()).Code);
+        await AssertNoIdentityMutations();
+        AssertNothingWritten();
+    }
+
+    /// <summary>
+    /// A disabled identity gets the password first and is enabled afterwards; the user is then created linked to it
+    /// and saved, and no identity is created.
+    /// </summary>
+    [Test]
+    public async Task Handle_DisabledIdentityAndCreationAllowed_SetsPasswordEnablesAndLinksUser()
+    {
+        // Arrange
+        var identity = GivenDisabledIdentity();
+        var handler = CreateHandler();
+
+        // Act
+        var result = await handler.Handle(ValidRequest(), CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        Received.InOrder(() =>
+        {
+            _identityProvider.SetPassword(identity.Id, "Secret#123", Arg.Any<CancellationToken>());
+            _identityProvider.SetEnabled(identity.Id, true, Arg.Any<CancellationToken>());
+        });
+        _added.Should().NotBeNull();
+        _added!.IdentityId.Should().Be(identity.Id);
+        await _unitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        await _identityProvider.DidNotReceive().Create(
+            Arg.Any<Login>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// A disabled identity needs a non-blank password to be enabled; nothing is changed or added otherwise.
+    /// </summary>
+    [Test]
+    [Arguments(null)]
+    [Arguments("")]
+    [Arguments("   ")]
+    public async Task Handle_DisabledIdentityAndBlankPassword_ReturnsEmptyPassword(string? password)
+    {
+        // Arrange
+        GivenDisabledIdentity();
+        var handler = CreateHandler();
+
+        // Act
+        var result = await handler.Handle(ValidRequest().WithPassword(password), CancellationToken.None);
+
+        // Assert
+        result.Errors.Select(e => e.Code).Should().Contain(IdentityErrors.EmptyPassword.Code);
+        await AssertNoIdentityMutations();
+        AssertNothingWritten();
+    }
+
+    /// <summary>
+    /// A password the provider rejects returns its errors; the identity is not enabled and nothing is added or saved.
+    /// </summary>
+    [Test]
+    public async Task Handle_DisabledIdentityAndSetPasswordFails_ReturnsProviderErrorsAndDoesNotEnable()
+    {
+        // Arrange
+        var identity = GivenDisabledIdentity();
+        _identityProvider.SetPassword(identity.Id, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns((ErrorOr<Success>)Error.Validation("Identity.WeakPassword", "Too weak."));
+        var handler = CreateHandler();
+
+        // Act
+        var result = await handler.Handle(ValidRequest(), CancellationToken.None);
+
+        // Assert
+        result.Errors.Should().ContainSingle().Which.Code.Should().Be("Identity.WeakPassword");
+        await _identityProvider.DidNotReceive().SetEnabled(
+            Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
+        AssertNothingWritten();
+    }
+
+    /// <summary>
+    /// When enabling fails, its errors are returned, nothing is added or saved and no compensation is attempted.
+    /// </summary>
+    [Test]
+    public async Task Handle_DisabledIdentityAndSetEnabledFails_ReturnsProviderErrorsAndWritesNothing()
+    {
+        // Arrange
+        var identity = GivenDisabledIdentity();
+        _identityProvider.SetEnabled(identity.Id, true, Arg.Any<CancellationToken>())
+            .Returns((ErrorOr<Success>)Error.Failure("Idp.EnableFailed"));
+        var handler = CreateHandler();
+
+        // Act
+        var result = await handler.Handle(ValidRequest(), CancellationToken.None);
+
+        // Assert
+        result.Errors.Should().ContainSingle().Which.Code.Should().Be("Idp.EnableFailed");
+        await _identityProvider.DidNotReceive().SetEnabled(
+            Arg.Any<string>(), false, Arg.Any<CancellationToken>());
+        AssertNothingWritten();
+    }
+
+    /// <summary>
+    /// When saving fails after the identity was enabled, the errors are returned and the identity is disabled again
+    /// without being deleted.
+    /// </summary>
+    [Test]
+    public async Task Handle_SaveFailsAfterEnablingIdentity_ReturnsErrorsAndDisablesIdentity()
+    {
+        // Arrange
+        var identity = GivenDisabledIdentity();
+        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns((ErrorOr<Success>)Error.Failure("Db.Failed"));
+        var handler = CreateHandler();
+
+        // Act
+        var result = await handler.Handle(ValidRequest(), CancellationToken.None);
+
+        // Assert
+        result.Errors.Select(e => e.Code).Should().ContainSingle().Which.Should().Be("Db.Failed");
+        await _identityProvider.Received(1).SetEnabled(identity.Id, false, CancellationToken.None);
+        await _identityProvider.DidNotReceive().Delete(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// When saving fails after the identity was enabled but a concurrent request linked its user to that identity
+    /// by then, the identity stays enabled so that user can still sign in.
+    /// </summary>
+    [Test]
+    public async Task Handle_SaveFailsAfterEnablingIdentityAndIdentityLinkedAtCompensation_KeepsIdentityEnabled()
+    {
+        // Arrange
+        var identity = GivenDisabledIdentity();
+        _userRepository.IsIdentityLinked(identity.Id, Arg.Any<CancellationToken>()).Returns(false, true);
+        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns((ErrorOr<Success>)Error.Failure("Db.Failed"));
+        var handler = CreateHandler();
+
+        // Act
+        var result = await handler.Handle(ValidRequest(), CancellationToken.None);
+
+        // Assert
+        result.Errors.Select(e => e.Code).Should().ContainSingle().Which.Should().Be("Db.Failed");
+        await _identityProvider.DidNotReceive().SetEnabled(identity.Id, false, Arg.Any<CancellationToken>());
+        await _identityProvider.DidNotReceive().Delete(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// When saving throws after the identity was enabled, the same exception propagates and the identity is disabled
+    /// again without being deleted.
+    /// </summary>
+    [Test]
+    public async Task Handle_SaveThrowsAfterEnablingIdentity_RethrowsAndDisablesIdentity()
+    {
+        // Arrange
+        var identity = GivenDisabledIdentity();
+        var exception = new InvalidOperationException("boom");
+        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>()).ThrowsAsync(exception);
+        var handler = CreateHandler();
+        InvalidOperationException? thrown = null;
+
+        // Act
+        try
+        {
+            await handler.Handle(ValidRequest(), CancellationToken.None);
+        }
+        catch (InvalidOperationException ex)
+        {
+            thrown = ex;
+        }
+
+        // Assert
+        thrown.Should().BeSameAs(exception);
+        await _identityProvider.Received(1).SetEnabled(identity.Id, false, CancellationToken.None);
+        await _identityProvider.DidNotReceive().Delete(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// When the save is cancelled after the identity was enabled, the cancellation propagates and the identity is
+    /// disabled again with a token that is not cancelled.
+    /// </summary>
+    [Test]
+    public async Task Handle_SaveCancelledAfterEnablingIdentity_RethrowsAndDisablesIdentityWithoutToken()
+    {
+        // Arrange
+        var identity = GivenDisabledIdentity();
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .ThrowsAsync(new OperationCanceledException(cts.Token));
+        var handler = CreateHandler();
+        OperationCanceledException? thrown = null;
+
+        // Act
+        try
+        {
+            await handler.Handle(ValidRequest(), cts.Token);
+        }
+        catch (OperationCanceledException ex)
+        {
+            thrown = ex;
+        }
+
+        // Assert
+        thrown.Should().NotBeNull();
+        await _identityProvider.Received(1).SetEnabled(identity.Id, false, CancellationToken.None);
+        await _identityProvider.DidNotReceive().Delete(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// A compensation that returns errors or throws does not replace the original save errors.
+    /// </summary>
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Handle_SaveFailsAndDisableFails_ReturnsOriginalSaveErrors(bool disableThrows)
+    {
+        // Arrange
+        var identity = GivenDisabledIdentity();
+        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns((ErrorOr<Success>)Error.Failure("Db.Failed"));
+        if (disableThrows)
+            _identityProvider.SetEnabled(identity.Id, false, Arg.Any<CancellationToken>())
+                .ThrowsAsync(new TimeoutException("idp down"));
+        else
+            _identityProvider.SetEnabled(identity.Id, false, Arg.Any<CancellationToken>())
+                .Returns((ErrorOr<Success>)Error.Failure("Idp.DisableFailed"));
+        var handler = CreateHandler();
+
+        // Act
+        var result = await handler.Handle(ValidRequest(), CancellationToken.None);
+
+        // Assert
+        result.Errors.Select(e => e.Code).Should().ContainSingle().Which.Should().Be("Db.Failed");
+        await _identityProvider.Received(1).SetEnabled(identity.Id, false, CancellationToken.None);
+    }
+
+    /// <summary>
+    /// A compensation that throws does not replace the original save exception.
+    /// </summary>
+    [Test]
+    public async Task Handle_SaveThrowsAndDisableThrows_RethrowsOriginalException()
+    {
+        // Arrange
+        var identity = GivenDisabledIdentity();
+        var exception = new InvalidOperationException("boom");
+        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>()).ThrowsAsync(exception);
+        _identityProvider.SetEnabled(identity.Id, false, Arg.Any<CancellationToken>())
+            .ThrowsAsync(new TimeoutException("idp down"));
+        var handler = CreateHandler();
+        InvalidOperationException? thrown = null;
+
+        // Act
+        try
+        {
+            await handler.Handle(ValidRequest(), CancellationToken.None);
+        }
+        catch (InvalidOperationException ex)
+        {
+            thrown = ex;
+        }
+
+        // Assert
+        thrown.Should().BeSameAs(exception);
+        await _identityProvider.Received(1).SetEnabled(identity.Id, false, CancellationToken.None);
+    }
+
+    /// <summary>
+    /// A disabled identity that is already linked to a user is rejected before any change at the provider.
+    /// </summary>
+    [Test]
+    public async Task Handle_DisabledIdentityAlreadyLinked_ReturnsIdentityAlreadyLinked()
+    {
+        // Arrange
+        var identity = GivenDisabledIdentity();
+        _userRepository.IsIdentityLinked(identity.Id, Arg.Any<CancellationToken>()).Returns(true);
+        var handler = CreateHandler();
+
+        // Act
+        var result = await handler.Handle(ValidRequest(), CancellationToken.None);
+
+        // Assert
+        result.Errors.Select(e => e.Code).Should().Contain(UserErrors.IdentityAlreadyLinked(identity.Id).Code);
+        await AssertNoIdentityMutations();
+        AssertNothingWritten();
+    }
+
+    /// <summary>
+    /// The response carries the name of the role the user was created with, and the user is not root.
+    /// </summary>
+    [Test]
+    public async Task Handle_RoleGiven_ReturnsRoleNameAndNonRootUser()
+    {
+        // Arrange
+        GivenNewIdentityCanBeCreated();
+        var role = GivenRole();
+        var handler = CreateHandler();
+
+        // Act
+        var result = await handler.Handle(ValidRequest().WithRole(role.Id), CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        result.Value.User.RoleName.Should().Be(role.Name);
+        result.Value.User.IsRoot.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// Without a role the response has no role name.
+    /// </summary>
+    [Test]
+    public async Task Handle_NoRoleId_ReturnsNullRoleName()
+    {
+        // Arrange
+        GivenNewIdentityCanBeCreated();
+        var handler = CreateHandler();
+
+        // Act
+        var result = await handler.Handle(ValidRequest(), CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        result.Value.User.RoleName.Should().BeNull();
     }
 }
 
