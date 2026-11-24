@@ -23,6 +23,25 @@ public static class UserErrors
         code: "User.RootAlreadyExists",
         description: "A root user already exists; there can be only one.");
 
+    public static Error RootCannotBeDeleted => Error.Forbidden(
+        code: "User.RootCannotBeDeleted",
+        description: "The root user cannot be deleted.");
+
+    public static Error AlreadyDeleted => Error.Conflict(
+        code: "User.AlreadyDeleted",
+        description: "The user is already deleted.");
+
+    public static Error NotDeleted => Error.Conflict(
+        code: "User.NotDeleted",
+        description: "The user is not deleted.");
+
+    /// <summary>
+    /// Another persisted user, soft-deleted ones included, is already linked to the same identity.
+    /// </summary>
+    public static Error IdentityAlreadyLinked(string identityId) => Error.Conflict(
+        code: "User.IdentityAlreadyLinked",
+        description: $"Identity '{identityId}' is already linked to another user.");
+
     public static Error RootAccessIsImmutable => Error.Forbidden(
         code: "User.RootAccessIsImmutable",
         description: "The root user bypasses access checks; its role and dedicated access cannot be changed.");

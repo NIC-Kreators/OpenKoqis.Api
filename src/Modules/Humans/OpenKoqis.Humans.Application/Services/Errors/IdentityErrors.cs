@@ -16,6 +16,14 @@ public static class IdentityErrors
         code: "Identity.NotFoundById",
         description: $"No identity with id '{identityId}' exists in the identity provider.");
 
+    /// <summary>
+    /// The identity with <paramref name="login"/> exists but is disabled, and OpenKoqis may not manage identities
+    /// to enable it.
+    /// </summary>
+    public static Error Disabled(Login login) => Error.Conflict(
+        code: "Identity.Disabled",
+        description: $"The identity with login '{login.Value}' is disabled in the identity provider.");
+
     public static Error AlreadyExists(Login login) => Error.Conflict(
         code: "Identity.AlreadyExists",
         description: $"An identity with login '{login.Value}' already exists in the identity provider.");
