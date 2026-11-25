@@ -21,6 +21,11 @@ public interface IUserRepository
     Task<User?> GetUserWithIdIncludingDeleted(Guid id, CancellationToken ct = default);
 
     /// <summary>
+    /// Returns the users assigned to the role <paramref name="roleId"/>, excluding soft-deleted ones.
+    /// </summary>
+    Task<IReadOnlyList<User>> GetActiveUsersWithRole(Guid roleId, CancellationToken ct = default);
+
+    /// <summary>
     /// Whether a root user is already persisted.
     /// </summary>
     Task<bool> IsRootAlreadyExists(CancellationToken ct = default);
