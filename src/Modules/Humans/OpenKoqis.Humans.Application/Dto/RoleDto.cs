@@ -23,5 +23,13 @@ public record RoleDto
     /// <summary>
     /// Maps <paramref name="role"/>.
     /// </summary>
-    public static RoleDto FromRole(Role role) => throw new NotImplementedException();
+    public static RoleDto FromRole(Role role) => new()
+    {
+        Id = role.Id,
+        Name = role.Name,
+        Accesses = [.. role.Accesses.Select(a => a.ToString())],
+        CreatedBy = role.CreatedBy,
+        CreatedAt = role.CreatedAt,
+        UpdatedAt = role.UpdatedAt,
+    };
 }
