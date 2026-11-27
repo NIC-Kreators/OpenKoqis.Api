@@ -3,8 +3,6 @@ using Mediator;
 using OpenKoqis.Humans.Application.Dto;
 using OpenKoqis.Shared.Application.Dto;
 
-#pragma warning disable CS9113 // Handle is not implemented yet, so the injected dependencies are unread.
-
 namespace OpenKoqis.Humans.Application.Features.Roles.Queries;
 
 public class GetRolesQueryRequest : IQuery<ErrorOr<PaginatedResponseDto<RoleSummaryDto>>>
@@ -24,6 +22,20 @@ public class GetRolesQueryRequest : IQuery<ErrorOr<PaginatedResponseDto<RoleSumm
 public class GetRolesQueryHandler(
     IRoleReadStore roleReadStore) : IQueryHandler<GetRolesQueryRequest, ErrorOr<PaginatedResponseDto<RoleSummaryDto>>>
 {
-    public ValueTask<ErrorOr<PaginatedResponseDto<RoleSummaryDto>>> Handle(GetRolesQueryRequest request, CancellationToken cancellationToken)
-        => throw new NotImplementedException();
+    public async ValueTask<ErrorOr<PaginatedResponseDto<RoleSummaryDto>>> Handle(GetRolesQueryRequest request, CancellationToken cancellationToken)
+    {
+        var pageRequest = PaginatedRequestDto.Create(request.Page, request.PageSize);
+
+        if (pageRequest.IsError)
+            return pageRequest.Errors;
+
+        var search = request.Search?.Trim();
+
+        var filter = new RoleFilter
+        {
+            Search = string.IsNullOrEmpty(search) ? null : search,
+        };
+
+        return await roleReadStore.GetRoles(filter, pageRequest.Value, cancellationToken);
+    }
 }
