@@ -1,18 +1,15 @@
 using OpenKoqis.Humans.Application.Persistence;
 using OpenKoqis.Humans.Domain.Roles;
-using OpenKoqis.Shared.Application.Dto;
 
 namespace OpenKoqis.Humans.Application.Features.Roles;
 
 /// <summary>
 /// Persisted roles of the Humans module. Roles returned by this repository are tracked: changes made to them, and roles
-/// added or removed through it, are persisted when <see cref="IHumansUnitOfWork"/> saves changes.
+/// added or removed through it, are persisted when <see cref="IHumansUnitOfWork"/> saves changes. Query results come
+/// from <see cref="IRoleReadStore"/> instead.
 /// </summary>
 public interface IRoleRepository
 {
-    Task<PaginatedResponseDto<Role>> SearchRolesByName(string name, PaginatedRequestDto paginatedRequest = default, CancellationToken ct = default);
-    Task<PaginatedResponseDto<Role>> GetPaginatedRoles(PaginatedRequestDto pageRequest = default, CancellationToken ct = default);
-
     /// <summary>
     /// Returns the role with the given <paramref name="id"/>; <c>null</c> when there is none.
     /// </summary>
